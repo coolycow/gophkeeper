@@ -4,667 +4,270 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestConfig(t *testing.T) {
-	fileStoragePath := getDefaultStoragePath()
-	databaseDSN := getDefaultDatabaseDSN()
-	secretKey := getDefaultSecretKey()
-	tlsCertFile := getDefaultTLSCertFile()
-	tlsKeyFile := getDefaultTLSKeyFile()
-	configFile := getDefaultConfigFile()
+// loadFromFlagsAndEnv парсит флаги и затем применяет переменные окружения (как в ручных сценариях тестирования).
+func loadFromFlagsAndEnv(t *testing.T, args []string) *ConfigServer {
+	t.Helper()
+	cfg, err := InitConfigServerWithArgs(args)
+	require.NoError(t, err)
+	cfg, err = initConfigServerWithEnv(cfg)
+	require.NoError(t, err)
+	return cfg
+}
 
+func TestInitConfigServerWithArgs_defaults(t *testing.T) {
+	cfg, err := InitConfigServerWithArgs(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "127.0.0.1", cfg.Host)
+	assert.Equal(t, 8080, cfg.Port)
+	assert.Equal(t, 0, cfg.GrpcPort)
+	assert.Equal(t, "info", cfg.LogLevel)
+	assert.Equal(t, "", cfg.DatabaseDSN)
+	assert.False(t, cfg.RunMigrations)
+	assert.False(t, cfg.EnableHTTPS)
+	assert.Equal(t, getDefaultTLSCertFile(), cfg.TLSCertFile)
+	assert.Equal(t, getDefaultTLSKeyFile(), cfg.TLSKeyFile)
+	assert.Equal(t, getDefaultConfigFile(), cfg.Config)
+	assert.Empty(t, cfg.TrustedSubnet)
+	assert.Equal(t, getDefaultSecretKey(), cfg.SecretKey)
+	assert.Equal(t, 10, cfg.SecretVersionCount)
+	assert.Equal(t, getDefaultSaltLength(), cfg.SaltLength)
+	assert.Equal(t, getDefaultMinPasswordLength(), cfg.MinPasswordLength)
+	assert.Equal(t, getDefaultMaxPasswordLength(), cfg.MaxPasswordLength)
+	assert.Empty(t, cfg.AuditFile)
+	assert.Empty(t, cfg.AuditURL)
+}
+
+func TestInitConfigServerWithArgs_flags(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
-		env  map[string]string
-		want Config
+		want func(*testing.T, *ConfigServer)
 	}{
 		{
-			name: "Default",
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "host and port",
+			args: []string{"--host", "localhost", "--port", "8082"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "localhost", c.Host)
+				assert.Equal(t, 8082, c.Port)
 			},
 		},
 		{
-			name: "Host And Port",
-			args: []string{"-h", "localhost", "-p", "8082"},
-			want: Config{
-				Host:                              "localhost",
-				Port:                              8082,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "grpc port",
+			args: []string{"--grpc-port", "50051"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, 50051, c.GrpcPort)
 			},
 		},
 		{
-			name: "Address",
-			args: []string{"-a", "localhost:8083"},
-			want: Config{
-				Host:                              "localhost",
-				Port:                              8083,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "log level",
+			args: []string{"--log-level", "debug"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "debug", c.LogLevel)
 			},
 		},
 		{
-			name: "Base URL",
-			args: []string{"-b", "http://localhost:8083"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://localhost:8083",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "database dsn",
+			args: []string{"--database-dsn", "postgres://localhost/db"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "postgres://localhost/db", c.DatabaseDSN)
 			},
 		},
 		{
-			name: "Database DSN",
-			args: []string{"-d", "test"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       "test",
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "run migrations",
+			args: []string{"--run-migrations", "true"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.True(t, c.RunMigrations)
 			},
 		},
 		{
-			name: "String options 1",
-			args: []string{"-x", "8"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                8,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "enable https",
+			args: []string{"--enable-https", "true"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.True(t, c.EnableHTTPS)
 			},
 		},
 		{
-			name: "String options 2",
-			args: []string{"-x", "8,200"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                8,
-				RandomStringMaxLength:             200,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "tls files",
+			args: []string{"--tls-cert-file", "cert.pem", "--tls-key-file", "key.pem"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "cert.pem", c.TLSCertFile)
+				assert.Equal(t, "key.pem", c.TLSKeyFile)
 			},
 		},
 		{
-			name: "String options 3",
-			args: []string{"-x", "8,200,5000"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                8,
-				RandomStringMaxLength:             200,
-				RandomStringMaxGenerationAttempts: 5000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "config path",
+			args: []string{"--config", "custom.json"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "custom.json", c.Config)
 			},
 		},
 		{
-			name: "Audit file",
-			args: []string{"-z", "audit.json"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				AuditFile:                         "audit.json",
-				AuditURL:                          "",
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "trusted subnet",
+			args: []string{"--trusted-subnet", "192.168.0.0/16"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "192.168.0.0/16", c.TrustedSubnet)
 			},
 		},
 		{
-			name: "Audit URL",
-			args: []string{"-u", "http://127.0.0.1:8080/audit"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				AuditFile:                         "",
-				AuditURL:                          "http://127.0.0.1:8080/audit",
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "secret key",
+			args: []string{"--secret-key", "01234567890123456789012345678901"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "01234567890123456789012345678901", c.SecretKey)
 			},
 		},
 		{
-			name: "Env: all settings",
-			env: map[string]string{
-				"HOST":                                  "localhost",
-				"PORT":                                  "8888",
-				"BASE_URL":                              "https://shortener.com",
-				"RANDOM_STRING_LENGTH":                  "7",
-				"RANDOM_STRING_MAX_LENGTH":              "8",
-				"RANDOM_STRING_MAX_GENERATION_ATTEMPTS": "9",
-			},
-			want: Config{
-				Host:                              "localhost",
-				Port:                              8888,
-				BaseURL:                           "https://shortener.com",
-				RandomStringLength:                7,
-				RandomStringMaxLength:             8,
-				RandomStringMaxGenerationAttempts: 9,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "secret version count",
+			args: []string{"--secret-version-count", "42"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, 42, c.SecretVersionCount)
 			},
 		},
 		{
-			name: "Env: server address and base url",
-			env: map[string]string{
-				"SERVER_ADDRESS": "127.0.0.2:8888",
-				"BASE_URL":       "https://shortener.com",
-			},
-			want: Config{
-				Host:                              "127.0.0.2",
-				Port:                              8888,
-				BaseURL:                           "https://shortener.com",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "salt length",
+			args: []string{"--salt-length", "16"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, 16, c.SaltLength)
 			},
 		},
 		{
-			name: "Settings priority",
-			args: []string{"-a", "localhost:8083", "-b", "http://localhost:8083"},
-			env: map[string]string{
-				"SERVER_ADDRESS": "127.0.0.2:8888",
-				"BASE_URL":       "https://shortener.com",
-			},
-			want: Config{
-				Host:                              "127.0.0.2",
-				Port:                              8888,
-				BaseURL:                           "https://shortener.com",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
+			name: "password length bounds",
+			args: []string{"--min-password-length", "8", "--max-password-length", "64"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, 8, c.MinPasswordLength)
+				assert.Equal(t, 64, c.MaxPasswordLength)
 			},
 		},
 		{
-			name: "Log level debug",
-			args: []string{"-e", "debug"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "debug",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Enable HTTPS",
-			args: []string{"-s", "true"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       true,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "TLS certificate file",
-			args: []string{"--tls-cert-file", "tls-cert.pem"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       "tls-cert.pem",
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "TLS key file",
-			args: []string{"--tls-key-file", "tls-key.pem"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        "tls-key.pem",
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Config file",
-			args: []string{"-c", "config.json"},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            "config.json",
-			},
-		},
-		{
-			name: "Env: log level warning",
-			env: map[string]string{
-				"SERVER_ADDRESS": "127.0.0.2:8888",
-				"BASE_URL":       "https://shortener.com",
-				"LOG_LEVEL":      "warn",
-			},
-			want: Config{
-				Host:                              "127.0.0.2",
-				Port:                              8888,
-				BaseURL:                           "https://shortener.com",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "warn",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: file storage path",
-			env: map[string]string{
-				"FILE_STORAGE_PATH": "test.json",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   "test.json",
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: database DSN",
-			env: map[string]string{
-				"DATABASE_DSN": "test",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       "test",
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: Secret Key",
-			env: map[string]string{
-				"SECRET_KEY": "test",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         "test",
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: Audit File",
-			env: map[string]string{
-				"AUDIT_FILE": "audit.json",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				AuditFile:                         "audit.json",
-				AuditURL:                          "",
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: Audit URL",
-			env: map[string]string{
-				"AUDIT_URL": "http://127.0.0.1:8080/audit",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				AuditFile:                         "",
-				AuditURL:                          "http://127.0.0.1:8080/audit",
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: Enable HTTPS",
-			env: map[string]string{
-				"ENABLE_HTTPS": "true",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       true,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: TLS certificate file",
-			env: map[string]string{
-				"TLS_CERT_FILE": "tls-cert.pem",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       "tls-cert.pem",
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: TLS key file",
-			env: map[string]string{
-				"TLS_KEY_FILE": "tls-key.pem",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        "tls-key.pem",
-				Config:                            configFile,
-			},
-		},
-		{
-			name: "Env: Config file",
-			env: map[string]string{
-				"CONFIG": "config.json",
-			},
-			want: Config{
-				Host:                              "127.0.0.1",
-				Port:                              8080,
-				BaseURL:                           "http://127.0.0.1:8080",
-				RandomStringLength:                6,
-				RandomStringMaxLength:             255,
-				RandomStringMaxGenerationAttempts: 1000,
-				LogLevel:                          "info",
-				FileStoragePath:                   fileStoragePath,
-				DatabaseDSN:                       databaseDSN,
-				SecretKey:                         secretKey,
-				EnableHTTPS:                       false,
-				TLSCertFile:                       tlsCertFile,
-				TLSKeyFile:                        tlsKeyFile,
-				Config:                            "config.json",
+			name: "audit file and url",
+			args: []string{"--audit-file", "audit.log", "--audit-url", "http://localhost/audit"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "audit.log", c.AuditFile)
+				assert.Equal(t, "http://localhost/audit", c.AuditURL)
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Устанавливаем переменные окружения для теста
-			for key, value := range tt.env {
-				t.Setenv(key, value)
-			}
-
-			// Сначала применяем настройки из флагов
-			cfg, err := InitConfigWithArgs(tt.args)
-			assert.NoError(t, err)
-
-			// Затем применяем настройки из переменных окружения
-			cfg, err = initConfigWithEnv(cfg)
-			assert.NoError(t, err)
-
-			assert.Equal(t, *cfg, tt.want)
+			cfg, err := InitConfigServerWithArgs(tt.args)
+			require.NoError(t, err)
+			tt.want(t, cfg)
 		})
 	}
 }
 
-// TestTrustedSubnetFromFlags проверяет, что trusted subnet устанавливается из флагов
-func TestTrustedSubnetFromFlags(t *testing.T) {
-	cfg, err := InitConfigWithArgs([]string{"-t", "192.168.0.0/16"})
-	assert.NoError(t, err)
-	assert.Equal(t, "192.168.0.0/16", cfg.TrustedSubnet)
+func TestInitConfigServerWithEnv_supportedVars(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want func(*testing.T, *ConfigServer)
+	}{
+		{
+			name: "host port grpc",
+			env: map[string]string{
+				"HOST":      "10.0.0.1",
+				"PORT":      "9000",
+				"GRPC_PORT": "50052",
+			},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "10.0.0.1", c.Host)
+				assert.Equal(t, 9000, c.Port)
+				assert.Equal(t, 50052, c.GrpcPort)
+			},
+		},
+		{
+			name: "log and database",
+			env: map[string]string{
+				"LOG_LEVEL":    "warn",
+				"DATABASE_DSN": "postgres://x",
+				"RUN_MIGRATIONS": "true",
+			},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "warn", c.LogLevel)
+				assert.Equal(t, "postgres://x", c.DatabaseDSN)
+				assert.True(t, c.RunMigrations)
+			},
+		},
+		{
+			name: "https and tls",
+			env: map[string]string{
+				"ENABLE_HTTPS":  "true",
+				"TLS_CERT_FILE": "c.pem",
+				"TLS_KEY_FILE":  "k.pem",
+			},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.True(t, c.EnableHTTPS)
+				assert.Equal(t, "c.pem", c.TLSCertFile)
+				assert.Equal(t, "k.pem", c.TLSKeyFile)
+			},
+		},
+		{
+			name: "secret and crypto params",
+			env: map[string]string{
+				"SECRET_KEY":             "01234567890123456789012345678901",
+				"SECRET_VERSION_COUNT":   "5",
+				"SALT_LENGTH":            "24",
+				"MIN_PASSWORD_LENGTH":    "10",
+				"MAX_PASSWORD_LENGTH":    "128",
+			},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "01234567890123456789012345678901", c.SecretKey)
+				assert.Equal(t, 5, c.SecretVersionCount)
+				assert.Equal(t, 24, c.SaltLength)
+				assert.Equal(t, 10, c.MinPasswordLength)
+				assert.Equal(t, 128, c.MaxPasswordLength)
+			},
+		},
+		{
+			name: "audit and subnet",
+			env: map[string]string{
+				"AUDIT_FILE":     "audit.json",
+				"AUDIT_URL":      "http://audit",
+				"TRUSTED_SUBNET": "10.0.0.0/8",
+			},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "audit.json", c.AuditFile)
+				assert.Equal(t, "http://audit", c.AuditURL)
+				assert.Equal(t, "10.0.0.0/8", c.TrustedSubnet)
+			},
+		},
+		{
+			name: "config path",
+			env: map[string]string{
+				"CONFIG": "from-env.json",
+			},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, "from-env.json", c.Config)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			cfg := loadFromFlagsAndEnv(t, nil)
+			tt.want(t, cfg)
+		})
+	}
 }
 
-// TestTrustedSubnetFromEnv проверяет, что trusted subnet устанавливается из переменных окружения
-func TestTrustedSubnetFromEnv(t *testing.T) {
-	t.Setenv("TRUSTED_SUBNET", "10.0.0.0/8")
-	cfg, err := InitConfigWithArgs(nil)
-	assert.NoError(t, err)
-	cfg, err = initConfigWithEnv(cfg)
-	assert.NoError(t, err)
-	assert.Equal(t, "10.0.0.0/8", cfg.TrustedSubnet)
+func TestEnvOverridesFlags(t *testing.T) {
+	t.Setenv("HOST", "from-env")
+	t.Setenv("PORT", "7777")
+
+	cfg := loadFromFlagsAndEnv(t, []string{"--host", "from-flag", "--port", "6666"})
+	assert.Equal(t, "from-env", cfg.Host)
+	assert.Equal(t, 7777, cfg.Port)
 }
 
-// TestInitConfigInvalidTrustedSubnet проверяет, что ошибка возвращается при некорректном trusted subnet
-func TestInitConfigInvalidTrustedSubnet(t *testing.T) {
+func TestInitConfigServer_invalidTrustedSubnet(t *testing.T) {
 	t.Setenv("TRUSTED_SUBNET", "not-a-cidr")
-	_, err := InitConfig()
-	assert.Error(t, err)
+	_, err := InitConfigServer()
+	require.Error(t, err)
 }

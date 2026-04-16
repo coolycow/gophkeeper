@@ -292,8 +292,8 @@ func parseServerFlags(args []string) (*ConfigServer, *flag.FlagSet, error) {
 	// Флаги для конфигурации
 	flagSet.StringVarP(&config.Config, "config", "c", getDefaultConfigFile(), "config file")
 
-	// Флаги для статистики
-	flagSet.StringVarP(&config.TrustedSubnet, "trusted-subnet", "s", "", "trusted CIDR for GET /api/internal/stats (X-Real-IP)")
+	// Флаги для статистики (без короткого имени: «s» занят enable-https)
+	flagSet.StringVar(&config.TrustedSubnet, "trusted-subnet", "", "trusted CIDR for GET /api/internal/stats (X-Real-IP)")
 
 	// Флаги для секретного ключа
 	flagSet.StringVarP(&config.SecretKey, "secret-key", "x", getDefaultSecretKey(), "secret key")
@@ -306,7 +306,8 @@ func parseServerFlags(args []string) (*ConfigServer, *flag.FlagSet, error) {
 
 	// Флаги для длины пароля
 	flagSet.IntVarP(&config.MinPasswordLength, "min-password-length", "o", getDefaultMinPasswordLength(), "minimum password length")
-	flagSet.IntVarP(&config.MaxPasswordLength, "max-password-length", "p", getDefaultMaxPasswordLength(), "maximum password length")
+	// без «p»: занят портом (--port)
+	flagSet.IntVar(&config.MaxPasswordLength, "max-password-length", getDefaultMaxPasswordLength(), "maximum password length")
 
 	// Флаги для аудита
 	flagSet.StringVarP(&config.AuditFile, "audit-file", "a", "", "audit file")
