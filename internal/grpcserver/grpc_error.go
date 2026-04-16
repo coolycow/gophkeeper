@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	httperr "github.com/coolycow/shortener/internal/error"
+	httperr "github.com/coolycow/gophkeeper/internal/error"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

@@ -33,6 +33,8 @@ type ConfigServer struct {
 	SaltLength         int    `env:"SALT_LENGTH" json:"salt_length,omitempty"`                   // Длина соли для шифрования данных
 	MinPasswordLength  int    `env:"MIN_PASSWORD_LENGTH" json:"min_password_length,omitempty"`   // Минимальная длина пароля
 	MaxPasswordLength  int    `env:"MAX_PASSWORD_LENGTH" json:"max_password_length,omitempty"`   // Максимальная длина пароля
+	AuditFile          string `env:"AUDIT_FILE" json:"audit_file,omitempty"`                     // Путь к файлу аудита
+	AuditURL           string `env:"AUDIT_URL" json:"audit_url,omitempty"`                       // URL для отправки аудита
 }
 
 // fileConfig — JSON-файл; указатели задают поля, явно присутствующие в файле.
@@ -53,6 +55,8 @@ type fileConfigServer struct {
 	SaltLength         *int    `json:"salt_length"`          // Длина соли для шифрования данных
 	MinPasswordLength  *int    `json:"min_password_length"`  // Минимальная длина пароля
 	MaxPasswordLength  *int    `json:"max_password_length"`  // Максимальная длина пароля
+	AuditFile          *string `json:"audit_file"`           // Путь к файлу аудита
+	AuditURL           *string `json:"audit_url"`            // URL для отправки аудита
 }
 
 // GetServerAddress возвращает полный адрес сервера для его запуска
@@ -76,6 +80,7 @@ func (c *ConfigServer) PrintConfig() {
 		c.EnableHTTPS, c.TLSCertFile, c.TLSKeyFile, c.TrustedSubnet, c.Config)
 	fmt.Fprintf(&b, "SecretVersionCount=%d", c.SecretVersionCount)
 	fmt.Fprintf(&b, "SaltLength=%d MinPasswordLength=%d MaxPasswordLength=%d", c.SaltLength, c.MinPasswordLength, c.MaxPasswordLength)
+	fmt.Fprintf(&b, "AuditFile=%s AuditURL=%s", c.AuditFile, c.AuditURL)
 	// Выводим настройки в лог
 	logger.Log.Info(b.String())
 }
@@ -238,6 +243,14 @@ func applyEnvToConfigServer(config *ConfigServer, skipConfigFromEnv bool) (*Conf
 		config.MaxPasswordLength, _ = strconv.Atoi(maxPasswordLength)
 	}
 
+	if auditFile, present := os.LookupEnv("AUDIT_FILE"); present {
+		config.AuditFile = auditFile
+	}
+
+	if auditURL, present := os.LookupEnv("AUDIT_URL"); present {
+		config.AuditURL = auditURL
+	}
+
 	if !skipConfigFromEnv {
 		if configFile, present := os.LookupEnv("CONFIG"); present {
 			config.Config = strings.TrimSpace(configFile)
@@ -295,6 +308,10 @@ func parseServerFlags(args []string) (*ConfigServer, *flag.FlagSet, error) {
 	flagSet.IntVarP(&config.MinPasswordLength, "min-password-length", "o", getDefaultMinPasswordLength(), "minimum password length")
 	flagSet.IntVarP(&config.MaxPasswordLength, "max-password-length", "p", getDefaultMaxPasswordLength(), "maximum password length")
 
+	// Флаги для аудита
+	flagSet.StringVarP(&config.AuditFile, "audit-file", "a", "", "audit file")
+	flagSet.StringVarP(&config.AuditURL, "audit-url", "b", "", "audit URL")
+
 	// Парсим флаги
 	err := flagSet.Parse(args)
 	if err != nil {
@@ -323,6 +340,8 @@ func defaultConfigServer() ConfigServer {
 		SaltLength:         getDefaultSaltLength(),
 		MinPasswordLength:  getDefaultMinPasswordLength(),
 		MaxPasswordLength:  getDefaultMaxPasswordLength(),
+		AuditFile:          getDefaultAuditFile(),
+		AuditURL:           getDefaultAuditURL(),
 	}
 }
 
@@ -377,6 +396,13 @@ func mergeConfigServerFromFile(cfg *ConfigServer, path string) error {
 	}
 	if fc.MaxPasswordLength != nil {
 		cfg.MaxPasswordLength = *fc.MaxPasswordLength
+	}
+
+	if fc.AuditFile != nil {
+		cfg.AuditFile = *fc.AuditFile
+	}
+	if fc.AuditURL != nil {
+		cfg.AuditURL = *fc.AuditURL
 	}
 
 	return nil
@@ -436,6 +462,12 @@ func applyExplicitServerFlags(dst *ConfigServer, src *ConfigServer, fs *flag.Fla
 	if fs.Changed("max-password-length") {
 		dst.MaxPasswordLength = src.MaxPasswordLength
 	}
+	if fs.Changed("audit-file") {
+		dst.AuditFile = src.AuditFile
+	}
+	if fs.Changed("audit-url") {
+		dst.AuditURL = src.AuditURL
+	}
 }
 
 // parseIntFromEnv парсит int-значение из переменной окружения и устанавливает его в поле конфигурации
@@ -488,6 +520,16 @@ func getDefaultMaxPasswordLength() int {
 // getDefaultSaltLength длина соли
 func getDefaultSaltLength() int {
 	return 32
+}
+
+// getDefaultAuditFile файл аудита по умолчанию
+func getDefaultAuditFile() string {
+	return "audit.json"
+}
+
+// getDefaultAuditURL URL для отправки аудита по умолчанию
+func getDefaultAuditURL() string {
+	return ""
 }
 
 // findAvailableTCPPort возвращает первый свободный TCP-порт на host, начиная с first (включительно).

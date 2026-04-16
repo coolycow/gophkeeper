@@ -1,9 +1,9 @@
-package shortener_test
+package gophkeeper_test
 
 import (
 	"testing"
 
-	"github.com/coolycow/shortener/internal/shortener"
+	"github.com/coolycow/gophkeeper/internal/gophkeeper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -11,9 +11,9 @@ import (
 func TestNormalizeShortenInput_Invalid(t *testing.T) {
 	t.Parallel()
 
-	_, err := shortener.NormalizeShortenInput("")
+	_, err := gophkeeper.NormalizeShortenInput("")
 	require.Error(t, err)
 
-	_, err = shortener.NormalizeShortenInput("not-a-url")
+	_, err = gophkeeper.NormalizeShortenInput("not-a-url")
 	require.Error(t, err)
 }

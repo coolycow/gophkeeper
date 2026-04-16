@@ -1,5 +1,5 @@
-// Package shortener — общая логика сокращения ссылок для HTTP (Gin) и gRPC.
-package shortener
+// Package gophkeeper — общая логика сокращения ссылок для HTTP (Gin) и gRPC.
+package gophkeeper
 
 import "context"
 

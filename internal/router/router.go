@@ -4,16 +4,16 @@ package router
 import (
 	"net/http/pprof"
 
-	"github.com/coolycow/shortener/internal/config"
-	"github.com/coolycow/shortener/internal/middleware"
-	"github.com/coolycow/shortener/internal/observer/audit"
-	"github.com/coolycow/shortener/internal/repository"
+	"github.com/coolycow/gophkeeper/internal/config"
+	"github.com/coolycow/gophkeeper/internal/middleware"
+	"github.com/coolycow/gophkeeper/internal/observer/audit"
+	"github.com/coolycow/gophkeeper/internal/repository"
 	"github.com/gin-gonic/contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
 // NewRouter создаёт HTTP-роутер с маршрутами сервиса коротких ссылок, gzip, логированием и pprof.
-func NewRouter(cfg *config.Config, repo repository.URLRepository, auditNotifier *audit.Notifier) *gin.Engine {
+func NewRouter(cfg *config.ConfigServer, repo repository.GophKeeperRepository, auditNotifier *audit.Notifier) *gin.Engine {
 	router := gin.Default()
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))

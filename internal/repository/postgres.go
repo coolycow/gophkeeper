@@ -425,11 +425,11 @@ func (r *PostgresRepository) HardDeleteSecret(ctx context.Context, userID string
 	return nil
 }
 
-// CompressSecretByID удаляет все версии секрета кроме последней
+// CompressSecretByID удаляет все версии секрета кроме актуальной
 func (r *PostgresRepository) CompressSecretByID(ctx context.Context, userID string, secretID string) error {
 	_, err := r.db.ExecContext(ctx, `delete from secret_versions 
 	where secret_id = $1 and secret_id in (select id from secrets where user_id = $2) 
-	and version != (select max(version) from secret_versions where secret_id = $1)`, secretID, userID)
+	and version != (select current_secret_version_id from secrets where user_id = $2 and id = $1)`, secretID, userID)
 
 	if err != nil {
 		logger.Log.Error("Error compressing secret by id", zap.Error(err))
@@ -439,11 +439,11 @@ func (r *PostgresRepository) CompressSecretByID(ctx context.Context, userID stri
 	return nil
 }
 
-// CompressSecretsByUserID удаляет все версии секретов кроме последних для всех секретов пользователя
+// CompressSecretsByUserID удаляет все версии секретов кроме актуальных для всех секретов пользователя
 func (r *PostgresRepository) CompressSecretsByUserID(ctx context.Context, userID string) error {
 	_, err := r.db.ExecContext(ctx, `delete from secret_versions 
 	where secret_id in (select id from secrets where user_id = $1) 
-	and version != (select max(version) from secret_versions where secret_id in (select id from secrets where user_id = $1))`, userID)
+	and version != (select current_secret_version_id from secrets where user_id = $1)`, userID)
 
 	if err != nil {
 		logger.Log.Error("Error compressing secrets by user id", zap.Error(err))
@@ -474,6 +474,26 @@ func (r *PostgresRepository) GetMaxSecretVersion(ctx context.Context, userID str
 }
 
 ////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С ИСТОРИЕЙ СЕКРЕТОВ //////////////////////////////////////////////////////////////
+
+// GetCurrentSecretVersion получает актуальную версию секрета
+func (r *PostgresRepository) GetCurrentSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error) {
+	// Получаем актуальную версию секрета по ID пользователя и ID секрета
+	row := r.db.QueryRowContext(ctx, `select id, secret_id, version, data_format_version, data_encrypted, data_size, created_at 
+	from secret_versions where secret_id = $1 
+	and secret_id in (select id from secrets where user_id = $2)`, secretID, userID)
+
+	// Получаем версию секрета
+	var secretVersion model.SecretVersion
+	err := row.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version, &secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize, &secretVersion.CreatedAt)
+
+	// Ошибка получения актуальной версии секрета
+	if err != nil {
+		logger.Log.Error("Error getting current secret version", zap.Error(err))
+		return nil, err
+	}
+
+	return &secretVersion, nil
+}
 
 // GetLatestSecretVersion получает последнюю версию секрета
 func (r *PostgresRepository) GetLatestSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error) {
@@ -704,12 +724,13 @@ func (r *PostgresRepository) RestoreSecretVersion(ctx context.Context, userID st
 // GetAttachmentByID получает вложение по его ID
 func (r *PostgresRepository) GetAttachmentByID(ctx context.Context, userID string, attachmentID string) (*model.Attachment, error) {
 	// Получаем вложение по его ID по ID пользователя и ID вложения
-	row := r.db.QueryRowContext(ctx, `select id, secret_version_id, data_format_version, data_encrypted, data_size, created_at 
+	row := r.db.QueryRowContext(ctx, `select id, secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_encrypted, data_size, created_at 
 	from attachments where id = $1 
 	and secret_version_id in (select id from secret_versions where secret_id in (select id from secrets where user_id = $2))`, attachmentID, userID)
 
 	var attachment model.Attachment
-	err := row.Scan(&attachment.ID, &attachment.SecretVersionID, &attachment.DataFormatVersion, &attachment.DataEncrypted, &attachment.DataSize, &attachment.CreatedAt)
+	err := row.Scan(&attachment.ID, &attachment.SecretVersionID, &attachment.DataFormatVersion, &attachment.InfoFormatVersion,
+		&attachment.InfoEncrypted, &attachment.InfoSize, &attachment.DataEncrypted, &attachment.DataSize, &attachment.CreatedAt)
 
 	// Ошибка получения вложения по его ID
 	if err != nil {
@@ -720,10 +741,10 @@ func (r *PostgresRepository) GetAttachmentByID(ctx context.Context, userID strin
 	return &attachment, nil
 }
 
-// GetAttachmentsBySecretID получает все вложения по ID секрета
-func (r *PostgresRepository) GetAttachmentsBySecretID(ctx context.Context, userID string, secretID string) ([]*model.Attachment, error) {
+// GetAttachmentsBySecretID получает все вложения по ID секрета (без data_encrypted — только метаданные для списка)
+func (r *PostgresRepository) GetAttachmentsBySecretID(ctx context.Context, userID string, secretID string) ([]*model.AttachmentSummary, error) {
 	// Получаем все вложения по ID секрета по ID пользователя и ID секрета
-	rows, err := r.db.QueryContext(ctx, `select id, secret_version_id, data_format_version, data_encrypted, data_size, created_at 
+	rows, err := r.db.QueryContext(ctx, `select id, secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_size, created_at 
 	from attachments 
 	where secret_version_id in (select id from secret_versions where secret_id = $1 and secret_id in (select id from secrets where user_id = $2))`, secretID, userID)
 
@@ -737,17 +758,18 @@ func (r *PostgresRepository) GetAttachmentsBySecretID(ctx context.Context, userI
 	defer rows.Close()
 
 	// Создаем слайс вложений
-	var attachments []*model.Attachment
+	var attachments []*model.AttachmentSummary
 
 	// Цикл по строкам
 	for rows.Next() {
-		var attachment model.Attachment
-		err := rows.Scan(&attachment.ID, &attachment.SecretVersionID, &attachment.DataFormatVersion, &attachment.DataEncrypted, &attachment.DataSize, &attachment.CreatedAt)
+		var summary model.AttachmentSummary
+		err := rows.Scan(&summary.ID, &summary.SecretVersionID, &summary.DataFormatVersion, &summary.InfoFormatVersion,
+			&summary.InfoEncrypted, &summary.InfoSize, &summary.DataSize, &summary.CreatedAt)
 		if err != nil {
 			logger.Log.Error("Error scanning attachment", zap.Error(err))
 			return nil, err
 		}
-		attachments = append(attachments, &attachment)
+		attachments = append(attachments, &summary)
 	}
 
 	if err = rows.Err(); err != nil {
@@ -758,10 +780,10 @@ func (r *PostgresRepository) GetAttachmentsBySecretID(ctx context.Context, userI
 	return attachments, nil
 }
 
-// GetAttachmentsBySecretVersionID получает все вложения по ID версии секрета
-func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context, userID string, secretVersionID string) ([]*model.Attachment, error) {
+// GetAttachmentsBySecretVersionID получает все вложения по ID версии секрета (без data_encrypted — только метаданные для списка)
+func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context, userID string, secretVersionID string) ([]*model.AttachmentSummary, error) {
 	// Получаем все вложения по ID версии секрета по ID пользователя и ID версии секрета
-	rows, err := r.db.QueryContext(ctx, `select id, secret_version_id, data_format_version, data_encrypted, data_size, created_at 
+	rows, err := r.db.QueryContext(ctx, `select id, secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_size, created_at 
 	from attachments 
 	where secret_version_id = $1 
 	and secret_version_id in (select id from secret_versions where secret_id in (select id from secrets where user_id = $2))`, secretVersionID, userID)
@@ -776,17 +798,18 @@ func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context
 	defer rows.Close()
 
 	// Создаем слайс вложений
-	var attachments []*model.Attachment
+	var attachments []*model.AttachmentSummary
 
 	// Цикл по строкам
 	for rows.Next() {
-		var attachment model.Attachment
-		err := rows.Scan(&attachment.ID, &attachment.SecretVersionID, &attachment.DataFormatVersion, &attachment.DataEncrypted, &attachment.DataSize, &attachment.CreatedAt)
+		var summary model.AttachmentSummary
+		err := rows.Scan(&summary.ID, &summary.SecretVersionID, &summary.DataFormatVersion, &summary.InfoFormatVersion,
+			&summary.InfoEncrypted, &summary.InfoSize, &summary.DataSize, &summary.CreatedAt)
 		if err != nil {
 			logger.Log.Error("Error scanning attachment", zap.Error(err))
 			return nil, err
 		}
-		attachments = append(attachments, &attachment)
+		attachments = append(attachments, &summary)
 	}
 
 	// Ошибка получения всех вложений по ID версии секрета
@@ -800,12 +823,13 @@ func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context
 
 // CreateAttachment создает вложение
 func (r *PostgresRepository) CreateAttachment(ctx context.Context, userID string, secretVersionID string, attachment *model.Attachment) (*model.Attachment, error) {
-	row := r.db.QueryRowContext(ctx, `insert into attachments (secret_version_id, data_format_version, data_encrypted, data_size) 
-	values ($1, $2, $3, $4) returning id, secret_version_id, data_format_version, data_encrypted, data_size, created_at`,
-		secretVersionID, attachment.DataFormatVersion, attachment.DataEncrypted, attachment.DataSize)
+	row := r.db.QueryRowContext(ctx, `insert into attachments (secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_encrypted, data_size)
+	values ($1, $2, $3, $4, $5, $6, $7) returning id, secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_encrypted, data_size, created_at`,
+		secretVersionID, attachment.DataFormatVersion, attachment.InfoFormatVersion, attachment.InfoEncrypted, attachment.InfoSize, attachment.DataEncrypted, attachment.DataSize)
 
 	var newAttachment model.Attachment
-	err := row.Scan(&newAttachment.ID, &newAttachment.SecretVersionID, &newAttachment.DataFormatVersion, &newAttachment.DataEncrypted, &newAttachment.DataSize, &newAttachment.CreatedAt)
+	err := row.Scan(&newAttachment.ID, &newAttachment.SecretVersionID, &newAttachment.DataFormatVersion, &newAttachment.InfoFormatVersion,
+		&newAttachment.InfoEncrypted, &newAttachment.InfoSize, &newAttachment.DataEncrypted, &newAttachment.DataSize, &newAttachment.CreatedAt)
 
 	// Ошибка создания вложения
 	if err != nil {

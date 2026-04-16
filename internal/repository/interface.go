@@ -31,11 +31,12 @@ type GophKeeperRepository interface {
 	UpdateSecret(ctx context.Context, userID string, secretID string, secret *model.Secret) error            // обновляет секрет
 	SoftDeleteSecret(ctx context.Context, userID string, secretID string) error                              // мягко удаляет секрет
 	HardDeleteSecret(ctx context.Context, userID string, secretID string) error                              // полностью удаляет секрет
-	CompressSecretByID(ctx context.Context, userID string, secretID string) error                            // удаляет все версии секрета кроме последней
-	CompressSecretsByUserID(ctx context.Context, userID string) error                                        // удаляет все версии секретов кроме последних для всех секретов пользователя
+	CompressSecretByID(ctx context.Context, userID string, secretID string) error                            // удаляет все версии секрета кроме актуальной
+	CompressSecretsByUserID(ctx context.Context, userID string) error                                        // удаляет все версии секретов кроме актуальной для всех секретов пользователя
 	GetMaxSecretVersion(ctx context.Context, userID string, secretID string) (int, error)                    // получает максимальную версию секрета
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С ИСТОРИЕЙ СЕКРЕТОВ //////////////////////////////////////////////////////////////
+	GetCurrentSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error)                                 // получает текущую версию секрета
 	GetLatestSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error)                                  // получает последнюю версию секрета
 	GetSecretVersionByID(ctx context.Context, userID string, secretID string, secretVersionID string) (*model.SecretVersion, error)            // получает версию секрета по его ID
 	GetAllSecretHistories(ctx context.Context, userID string, secretID string) ([]*model.SecretVersion, error)                                 // получает все версии секрета
@@ -45,8 +46,8 @@ type GophKeeperRepository interface {
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С ВЛОЖЕНИЯМИ //////////////////////////////////////////////////////////////
 	GetAttachmentByID(ctx context.Context, userID string, attachmentID string) (*model.Attachment, error)                                 // получает вложение по его ID
-	GetAttachmentsBySecretID(ctx context.Context, userID string, secretID string) ([]*model.Attachment, error)                            // получает все вложения по ID секрета
-	GetAttachmentsBySecretVersionID(ctx context.Context, userID string, secretVersionID string) ([]*model.Attachment, error)              // получает все вложения по ID версии секрета
+	GetAttachmentsBySecretID(ctx context.Context, userID string, secretID string) ([]*model.AttachmentSummary, error)                     // получает все вложения по ID секрета (без тела data_encrypted)
+	GetAttachmentsBySecretVersionID(ctx context.Context, userID string, secretVersionID string) ([]*model.AttachmentSummary, error)       // получает все вложения по ID версии секрета (без тела data_encrypted)
 	CreateAttachment(ctx context.Context, userID string, secretVersionID string, attachment *model.Attachment) (*model.Attachment, error) // создает вложение
 	HardDeleteAttachment(ctx context.Context, userID string, attachmentID string) error                                                   // удаляет вложение
 }

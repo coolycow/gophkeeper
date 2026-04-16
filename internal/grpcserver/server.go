@@ -4,27 +4,35 @@ package grpcserver
 import (
 	"context"
 
-	"github.com/coolycow/shortener/internal/observer/audit"
-	"github.com/coolycow/shortener/internal/proto/shortenerpb"
-	"github.com/coolycow/shortener/internal/service"
+	"github.com/coolycow/gophkeeper/internal/observer/audit"
+	"github.com/coolycow/gophkeeper/internal/proto/shortenerpb"
+	"github.com/coolycow/gophkeeper/internal/service"
 	"github.com/coolycow/shortener/internal/shortener"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// Server реализует shortenerpb.ShortenerServiceServer, вызывая пакет shortener.
+// Server реализует gophkeeperpb.GophKeeperServiceServer, вызывая пакет gophkeeper.
 type Server struct {
-	shortenerpb.UnimplementedShortenerServiceServer
-	url           service.URLService
-	auditNotifier *audit.Notifier
+	gophkeeperpb.UnimplementedGophKeeperServiceServer
+	auditNotifier    *audit.Notifier
+	userSvc          service.UserService
+	secretSvc        service.SecretService
+	secretVersionSvc service.SecretVersionService
+	attachmentSvc    service.AttachmentService
 }
 
 // NewServer собирает gRPC-обработчик с зависимостями, совпадающими с HTTP-хендлерами.
-func NewServer(urlSvc service.URLService, auditNotifier *audit.Notifier) *Server {
+func NewServer(auditNotifier *audit.Notifier,
+	userSvc service.UserService, secretSvc service.SecretService,
+	secretVersionSvc service.SecretVersionService, attachmentSvc service.AttachmentService) *Server {
 	return &Server{
-		url:           urlSvc,
-		auditNotifier: auditNotifier,
+		auditNotifier:    auditNotifier,
+		userSvc:          userSvc,
+		secretSvc:        secretSvc,
+		secretVersionSvc: secretVersionSvc,
+		attachmentSvc:    attachmentSvc,
 	}
 }
 

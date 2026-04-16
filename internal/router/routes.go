@@ -4,12 +4,12 @@ import (
 	"net"
 	"strings"
 
-	"github.com/coolycow/shortener/internal/config"
-	"github.com/coolycow/shortener/internal/handler"
-	"github.com/coolycow/shortener/internal/middleware"
-	"github.com/coolycow/shortener/internal/observer/audit"
-	"github.com/coolycow/shortener/internal/repository"
-	"github.com/coolycow/shortener/internal/service"
+	"github.com/coolycow/gophkeeper/internal/config"
+	"github.com/coolycow/gophkeeper/internal/handler"
+	"github.com/coolycow/gophkeeper/internal/middleware"
+	"github.com/coolycow/gophkeeper/internal/observer/audit"
+	"github.com/coolycow/gophkeeper/internal/repository"
+	"github.com/coolycow/gophkeeper/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,11 +27,14 @@ func parseTrustedSubnet(cidr string) (*net.IPNet, error) {
 // setupURLRoutes настраивает маршруты для URL-сервиса
 func setupURLRoutes(
 	r *gin.Engine,
-	cfg *config.Config,
-	repo repository.URLRepository,
-	auditNotifier *audit.Notifier,
-) {
-	srv := service.NewURLService(cfg, repo)
+	cfg *config.ConfigServer,
+	repo repository.GophKeeperRepository,
+	auditNotifier *audit.Notifier) {
+	// Сервисы для gRPC совпадают по смыслу с теми, что создаёт router (общий repo).
+	userSvc := service.NewUserService(cfg, repo)
+	secretSvc := service.NewSecretService(cfg, repo)
+	secretVersionSvc := service.NewSecretVersionService(cfg, repo)
+	attachmentSvc := service.NewAttachmentService(cfg, repo)
 	cookieService := service.NewUserService(cfg, repo)
 
 	// Парсим trusted subnet
@@ -40,6 +43,7 @@ func setupURLRoutes(
 		trusted = nil
 	}
 
+	// Ping handler
 	r.GET("/ping", handler.PingHandler(srv))
 
 	// Маршрут для получения статистики
