@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/coolycow/shortener/internal/error"
+	"github.com/coolycow/gophkeeper/internal/error"
 	"github.com/gin-gonic/gin"
 )
 

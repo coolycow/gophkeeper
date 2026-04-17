@@ -135,9 +135,11 @@ func main() {
 		grpcOpts = append(grpcOpts, grpc.Creds(creds))
 	}
 
+	// Инициализируем gRPC сервер
 	grpcSrv := grpc.NewServer(grpcOpts...)
 	grpcserver.NewServer(auditNotifier, userSvc, secretSvc, secretVersionSvc, attachmentSvc).Register(grpcSrv)
 
+	// Получаем адрес gRPC сервера и запускаем сервер
 	grpcLis, err := net.Listen("tcp", cfg.GetGRPCServerAddress())
 	if err != nil {
 		log.Fatalf("Failed to listen gRPC: %v", err)
@@ -145,6 +147,7 @@ func main() {
 
 	logger.Log.Info("Running gRPC server", zap.String("address", cfg.GetGRPCServerAddress()))
 
+	// Запускаем gRPC сервер
 	go func() {
 		if serveErr := grpcSrv.Serve(grpcLis); serveErr != nil {
 			logger.Log.Fatal("gRPC server error", zap.Error(serveErr))
