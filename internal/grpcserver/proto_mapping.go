@@ -28,9 +28,9 @@ func protoSecretVersion(v *model.SecretVersion) *gophkeeperpb.SecretVersion {
 		DataFormatVersion: int32(v.DataFormatVersion),
 		DataEncrypted:     v.DataEncrypted,
 		DataSize:          int32(v.DataSize),
-		CreatedAt:         timeProto(v.CreatedAt),
-		UpdatedAt:         timeProto(v.UpdatedAt),
-		DeletedAt:         timeProto(v.DeletedAt),
+		CreatedAt:         timeProto(*v.CreatedAt),
+		UpdatedAt:         timeProto(*v.UpdatedAt),
+		DeletedAt:         timeProto(*v.DeletedAt),
 	}
 }
 
@@ -43,9 +43,9 @@ func protoSecret(s *model.Secret, current *model.SecretVersion, history []*model
 		Id:                     s.ID,
 		UserId:                 s.UserID,
 		CurrentSecretVersionId: s.CurrentSecretVersionID,
-		CreatedAt:              timeProto(s.CreatedAt),
-		UpdatedAt:              timeProto(s.UpdatedAt),
-		DeletedAt:              timeProto(s.DeletedAt),
+		CreatedAt:              timeProto(*s.CreatedAt),
+		UpdatedAt:              timeProto(*s.UpdatedAt),
+		DeletedAt:              timeProto(*s.DeletedAt),
 		CurrentVersion:         protoSecretVersion(current),
 	}
 	if includeHistory && len(history) > 0 {
@@ -71,7 +71,7 @@ func protoAttachmentSummary(a *model.AttachmentSummary) *gophkeeperpb.Attachment
 		InfoEncrypted:     a.InfoEncrypted,
 		InfoSize:          int32(a.InfoSize),
 		DataSize:          int32(a.DataSize),
-		CreatedAt:         timeProto(a.CreatedAt),
+		CreatedAt:         timeProto(*a.CreatedAt),
 	}
 }
 
@@ -89,6 +89,6 @@ func protoAttachment(a *model.Attachment) *gophkeeperpb.Attachment {
 		InfoSize:          int32(a.InfoSize),
 		DataEncrypted:     a.DataEncrypted,
 		DataSize:          int32(a.DataSize),
-		CreatedAt:         timeProto(a.CreatedAt),
+		CreatedAt:         timeProto(*a.CreatedAt),
 	}
 }

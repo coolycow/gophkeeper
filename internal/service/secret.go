@@ -75,11 +75,13 @@ func (s *secretService) CreateSecret(ctx context.Context, userID string, request
 	data := request.DataEncrypted
 
 	// Создаем секрет
+	now := time.Now()
+
 	secret := &model.Secret{
 		UserID:    userID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		DeletedAt: time.Time{},
+		CreatedAt: &now,
+		UpdatedAt: &now,
+		DeletedAt: &now,
 		SecretVersions: []*model.SecretVersion{
 			{
 				DataFormatVersion: dfv,

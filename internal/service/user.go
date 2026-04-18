@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -134,7 +135,8 @@ func (s *userService) CreateUser(ctx context.Context, request model.UserRegister
 	// Проверяем, существует ли пользователь с такой email
 	existingUser, err := s.repo.GetUserByEmail(ctx, request.Email)
 
-	if err != nil {
+	// Если ошибка, возвращаем ошибку, если она не является ошибкой отсутствия пользователя
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, keeperError.CustomError{
 			Message:    err.Error(),
 			StatusCode: http.StatusInternalServerError,
@@ -171,13 +173,15 @@ func (s *userService) CreateUser(ctx context.Context, request model.UserRegister
 		}
 	}
 
+	now := time.Now()
+
 	// Создаём пользователя
 	return s.repo.CreateUser(ctx, &model.User{
 		Email:     request.Email,
 		Password:  hashedPassword,
 		Salt:      hex.EncodeToString(salt),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: &now,
+		UpdatedAt: &now,
 	})
 }
 
@@ -265,12 +269,14 @@ func (s *userService) UpdateUser(ctx context.Context, userID string, request mod
 
 	// TODO: Если изменился пароль, то все данные должны быть зашифрованы заново
 
+	now := time.Now()
+
 	// Обновляем пользователя
 	return s.repo.UpdateUser(ctx, userID, &model.User{
 		Email:     request.Email, // Email может быть изменен или не изменен
 		Password:  user.Password, // Пароль может быть изменен или не изменен
 		Salt:      user.Salt,     // Соль не изменяется
-		UpdatedAt: time.Now(),
+		UpdatedAt: &now,
 	})
 }
 

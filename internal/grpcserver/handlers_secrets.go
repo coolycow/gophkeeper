@@ -31,10 +31,10 @@ func (s *Server) ListSecrets(ctx context.Context, req *gophkeeperpb.ListSecretsR
 		sum := &gophkeeperpb.SecretSummary{
 			Id:                     sec.ID,
 			CurrentSecretVersionId: sec.CurrentSecretVersionID,
-			UpdatedAt:              timestamppb.New(sec.UpdatedAt),
+			UpdatedAt:              timestamppb.New(*sec.UpdatedAt),
 		}
 		if !sec.DeletedAt.IsZero() {
-			sum.DeletedAt = timestamppb.New(sec.DeletedAt)
+			sum.DeletedAt = timestamppb.New(*sec.DeletedAt)
 		}
 		out = append(out, sum)
 	}

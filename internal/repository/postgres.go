@@ -12,7 +12,6 @@ import (
 
 	"github.com/coolycow/gophkeeper/internal/logger"
 	"github.com/coolycow/gophkeeper/internal/model"
-	"go.uber.org/zap"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/pgx/v5"
@@ -153,7 +152,6 @@ func (r *PostgresRepository) GetUserByID(ctx context.Context, userID string) (*m
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.Salt, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 
 	if err != nil {
-		logger.Log.Error("Error getting user by id", zap.Error(err))
 		return nil, err
 	}
 
@@ -168,7 +166,6 @@ func (r *PostgresRepository) GetUserByEmail(ctx context.Context, email string) (
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.Salt, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 
 	if err != nil {
-		logger.Log.Error("Error getting user by email", zap.Error(err))
 		return nil, err
 	}
 
@@ -177,13 +174,15 @@ func (r *PostgresRepository) GetUserByEmail(ctx context.Context, email string) (
 
 // CreateUser создает нового пользователя
 func (r *PostgresRepository) CreateUser(ctx context.Context, user *model.User) (*model.User, error) {
-	row := r.db.QueryRowContext(ctx, "insert into users (email, password, salt) values ($1, $2, $3) returning id, email, password, salt", user.Email, user.Password, user.Salt)
+	row := r.db.QueryRowContext(ctx, `insert into users (email, password, salt) 
+	values ($1, $2, $3) returning id, email, password, salt, created_at, updated_at, deleted_at`,
+		user.Email, user.Password, user.Salt)
 
 	var newUser model.User
-	err := row.Scan(&newUser.ID, &newUser.Email, &newUser.Password, &newUser.Salt, &newUser.CreatedAt, &newUser.UpdatedAt, &newUser.DeletedAt)
+	err := row.Scan(&newUser.ID, &newUser.Email, &newUser.Password, &newUser.Salt,
+		&newUser.CreatedAt, &newUser.UpdatedAt, &newUser.DeletedAt)
 
 	if err != nil {
-		logger.Log.Error("Error creating user", zap.Error(err))
 		return nil, err
 	}
 
@@ -197,7 +196,6 @@ func (r *PostgresRepository) UpdateUser(ctx context.Context, userID string, user
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.Salt, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 
 	if err != nil {
-		logger.Log.Error("Error updating user", zap.Error(err))
 		return err
 	}
 
@@ -209,7 +207,6 @@ func (r *PostgresRepository) SoftDeleteUser(ctx context.Context, userID string) 
 	_, err := r.db.ExecContext(ctx, "update users set deleted_at = $1 where id = $2", time.Now(), userID)
 
 	if err != nil {
-		logger.Log.Error("Error soft deleting user", zap.Error(err))
 		return err
 	}
 
@@ -221,7 +218,6 @@ func (r *PostgresRepository) HardDeleteUser(ctx context.Context, userID string) 
 	_, err := r.db.ExecContext(ctx, "delete from users where id = $1", userID)
 
 	if err != nil {
-		logger.Log.Error("Error deleting user", zap.Error(err))
 		return err
 	}
 
@@ -234,7 +230,6 @@ func (r *PostgresRepository) GetUsersCount(ctx context.Context) int {
 
 	var count int64
 	if err := row.Scan(&count); err != nil {
-		logger.Log.Error("Error scanning users count", zap.Error(err))
 		return 0
 	}
 	return int(count)
@@ -250,7 +245,6 @@ func (r *PostgresRepository) GetSecretByID(ctx context.Context, secretID string)
 	var currentVersionID sql.NullString
 	err := row.Scan(&secret.ID, &secret.UserID, &currentVersionID, &secret.CreatedAt, &secret.UpdatedAt, &secret.DeletedAt)
 	if err != nil {
-		logger.Log.Error("Error getting secret by id", zap.Error(err))
 		return nil, err
 	}
 	if currentVersionID.Valid {
@@ -281,7 +275,6 @@ func (r *PostgresRepository) GetSecretsByUserID(ctx context.Context, userID stri
 	rows, err := r.db.QueryContext(ctx, q, userID)
 
 	if err != nil {
-		logger.Log.Error("Error getting secrets by user id", zap.Error(err))
 		return nil, err
 	}
 
@@ -293,7 +286,6 @@ func (r *PostgresRepository) GetSecretsByUserID(ctx context.Context, userID stri
 		var currentVersionID sql.NullString
 		err := rows.Scan(&secret.ID, &secret.UserID, &currentVersionID, &secret.CreatedAt, &secret.UpdatedAt, &secret.DeletedAt)
 		if err != nil {
-			logger.Log.Error("Error scanning secret", zap.Error(err))
 			return nil, err
 		}
 		if currentVersionID.Valid {
@@ -303,7 +295,6 @@ func (r *PostgresRepository) GetSecretsByUserID(ctx context.Context, userID stri
 	}
 
 	if err = rows.Err(); err != nil {
-		logger.Log.Error("Error getting secrets by user id", zap.Error(err))
 		return nil, err
 	}
 
@@ -319,7 +310,6 @@ func (r *PostgresRepository) GetSecretByUserIDAndSecretID(ctx context.Context, u
 	err := row.Scan(&secret.ID, &secret.UserID, &currentVersionID, &secret.CreatedAt, &secret.UpdatedAt, &secret.DeletedAt)
 
 	if err != nil {
-		logger.Log.Error("Error getting secret by user id and secret id", zap.Error(err))
 		return nil, err
 	}
 
@@ -336,7 +326,6 @@ func (r *PostgresRepository) CreateSecret(ctx context.Context, userID string, se
 
 	// Ошибка начала транзакции
 	if err != nil {
-		logger.Log.Error("Error beginning transaction", zap.Error(err))
 		return nil, err
 	}
 
@@ -347,7 +336,6 @@ func (r *PostgresRepository) CreateSecret(ctx context.Context, userID string, se
 	var newSecret model.Secret
 	err = rowSecret.Scan(&newSecret.ID, &newSecret.UserID, &newSecret.CreatedAt, &newSecret.UpdatedAt, &newSecret.DeletedAt)
 	if err != nil {
-		logger.Log.Error("Error creating secret", zap.Error(err))
 		_ = tx.Rollback()
 		return nil, err
 	}
@@ -367,7 +355,6 @@ func (r *PostgresRepository) CreateSecret(ctx context.Context, userID string, se
 		&newSecretVersion.DataFormatVersion, &newSecretVersion.DataEncrypted,
 		&newSecretVersion.DataSize, &newSecretVersion.CreatedAt)
 	if err != nil {
-		logger.Log.Error("Error creating secret version", zap.Error(err))
 		_ = tx.Rollback()
 		return nil, err
 	}
@@ -382,7 +369,6 @@ func (r *PostgresRepository) CreateSecret(ctx context.Context, userID string, se
 
 	// Ошибка привязки секрета к версии
 	if err != nil {
-		logger.Log.Error("Error linking secret to version", zap.Error(err))
 		_ = tx.Rollback()
 		return nil, err
 	}
@@ -392,7 +378,6 @@ func (r *PostgresRepository) CreateSecret(ctx context.Context, userID string, se
 
 	// Фиксируем транзакцию
 	if err = tx.Commit(); err != nil {
-		logger.Log.Error("Error committing transaction", zap.Error(err))
 		return nil, err
 	}
 
@@ -410,7 +395,6 @@ func (r *PostgresRepository) UpdateSecret(ctx context.Context, userID string, se
 
 	// Ошибка обновления секрета
 	if err != nil {
-		logger.Log.Error("Error updating secret", zap.Error(err))
 		return err
 	}
 
@@ -427,7 +411,6 @@ func (r *PostgresRepository) SoftDeleteSecret(ctx context.Context, userID string
 	_, err := r.db.ExecContext(ctx, "update secrets set deleted_at = $1 where user_id = $2 and id = $3", time.Now(), userID, secretID)
 
 	if err != nil {
-		logger.Log.Error("Error soft deleting secret", zap.Error(err))
 		return err
 	}
 
@@ -439,7 +422,6 @@ func (r *PostgresRepository) HardDeleteSecret(ctx context.Context, userID string
 	_, err := r.db.ExecContext(ctx, "delete from secrets where user_id = $1 and id = $2", userID, secretID)
 
 	if err != nil {
-		logger.Log.Error("Error deleting secret", zap.Error(err))
 		return err
 	}
 
@@ -453,7 +435,6 @@ func (r *PostgresRepository) CompressSecretByID(ctx context.Context, userID stri
 	and version != (select current_secret_version_id from secrets where user_id = $2 and id = $1)`, secretID, userID)
 
 	if err != nil {
-		logger.Log.Error("Error compressing secret by id", zap.Error(err))
 		return err
 	}
 
@@ -467,7 +448,6 @@ func (r *PostgresRepository) CompressSecretsByUserID(ctx context.Context, userID
 	and version != (select current_secret_version_id from secrets where user_id = $1)`, userID)
 
 	if err != nil {
-		logger.Log.Error("Error compressing secrets by user id", zap.Error(err))
 		return err
 	}
 
@@ -483,7 +463,6 @@ func (r *PostgresRepository) GetMaxSecretVersion(ctx context.Context, userID str
 	err := row.Scan(&maxVersion)
 
 	if err != nil {
-		logger.Log.Error("Error getting max secret version", zap.Error(err))
 		return 0, err
 	}
 
@@ -509,7 +488,6 @@ func (r *PostgresRepository) GetCurrentSecretVersion(ctx context.Context, userID
 
 	// Ошибка получения актуальной версии секрета
 	if err != nil {
-		logger.Log.Error("Error getting current secret version", zap.Error(err))
 		return nil, err
 	}
 
@@ -530,7 +508,6 @@ func (r *PostgresRepository) GetLatestSecretVersion(ctx context.Context, userID 
 	err := row.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version, &secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize, &secretVersion.CreatedAt)
 
 	if err != nil {
-		logger.Log.Error("Error getting latest secret Version", zap.Error(err))
 		return nil, err
 	}
 
@@ -551,7 +528,6 @@ func (r *PostgresRepository) GetSecretVersionByID(ctx context.Context, userID st
 	err := row.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version, &secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize, &secretVersion.CreatedAt)
 
 	if err != nil {
-		logger.Log.Error("Error getting secret Version by id", zap.Error(err))
 		return nil, err
 	}
 
@@ -569,7 +545,6 @@ func (r *PostgresRepository) GetAllSecretHistories(ctx context.Context, userID s
 
 	// Ошибка получения всех версий секрета
 	if err != nil {
-		logger.Log.Error("Error getting all secret histories", zap.Error(err))
 		return nil, err
 	}
 
@@ -586,7 +561,6 @@ func (r *PostgresRepository) GetAllSecretHistories(ctx context.Context, userID s
 			&secretVersion.DataEncrypted, &secretVersion.DataSize, &secretVersion.CreatedAt)
 
 		if err != nil {
-			logger.Log.Error("Error scanning secret Version", zap.Error(err))
 			return nil, err
 		}
 
@@ -595,7 +569,6 @@ func (r *PostgresRepository) GetAllSecretHistories(ctx context.Context, userID s
 
 	// Ошибка получения всех версий секрета
 	if err = rows.Err(); err != nil {
-		logger.Log.Error("Error getting all secret histories", zap.Error(err))
 		return nil, err
 	}
 
@@ -608,7 +581,6 @@ func (r *PostgresRepository) CreateSecretVersion(ctx context.Context, userID str
 	tx, err := r.db.BeginTx(ctx, nil)
 
 	if err != nil {
-		logger.Log.Error("Error beginning transaction", zap.Error(err))
 		return nil, err
 	}
 
@@ -619,7 +591,6 @@ func (r *PostgresRepository) CreateSecretVersion(ctx context.Context, userID str
 	var dummy int
 	err = row.Scan(&dummy)
 	if err != nil {
-		logger.Log.Error("Error locking secret", zap.Error(err))
 		_ = tx.Rollback()
 		return nil, err
 	}
@@ -632,7 +603,6 @@ func (r *PostgresRepository) CreateSecretVersion(ctx context.Context, userID str
 
 	// Ошибка получения максимальной версии секрета
 	if err != nil {
-		logger.Log.Error("Error getting max secret version", zap.Error(err))
 		_ = tx.Rollback()
 		return nil, err
 	}
@@ -652,7 +622,6 @@ func (r *PostgresRepository) CreateSecretVersion(ctx context.Context, userID str
 
 	// Ошибка создания версии секрета
 	if err != nil {
-		logger.Log.Error("Error creating secret version", zap.Error(err))
 		_ = tx.Rollback()
 		return nil, err
 	}
@@ -660,14 +629,12 @@ func (r *PostgresRepository) CreateSecretVersion(ctx context.Context, userID str
 	// Привязываем версию секрета к секрету как текущую версию
 	_, err = tx.ExecContext(ctx, "update secrets set current_secret_version_id = $1 where user_id = $2 and id = $3", newSecretVersion.ID, userID, secretID)
 	if err != nil {
-		logger.Log.Error("Error linking secret to version", zap.Error(err))
 		_ = tx.Rollback()
 		return nil, err
 	}
 
 	// Фиксируем транзакцию
 	if err = tx.Commit(); err != nil {
-		logger.Log.Error("Error committing transaction", zap.Error(err))
 		return nil, err
 	}
 
@@ -689,7 +656,6 @@ func (r *PostgresRepository) HardDeleteSecretVersion(ctx context.Context, userID
 
 	// Ошибка удаления версии секрета
 	if err != nil {
-		logger.Log.Error("Error deleting secret version", zap.Error(err))
 		return err
 	}
 
@@ -707,7 +673,6 @@ func (r *PostgresRepository) HardDeleteOldestSecretVersion(ctx context.Context, 
 	err := row.Scan(&count)
 
 	if err != nil {
-		logger.Log.Error("Error getting count of secret versions", zap.Error(err))
 		return err
 	}
 
@@ -716,7 +681,6 @@ func (r *PostgresRepository) HardDeleteOldestSecretVersion(ctx context.Context, 
 		_, err := r.db.ExecContext(ctx, "delete from secret_versions where secret_id = $1 and secret_id in (select id from secrets where user_id = $2)", secretID, userID)
 
 		if err != nil {
-			logger.Log.Error("Error deleting oldest secret version", zap.Error(err))
 			return err
 		}
 
@@ -733,7 +697,6 @@ func (r *PostgresRepository) HardDeleteOldestSecretVersion(ctx context.Context, 
 		and version <> (select current_secret_version_id from secrets where user_id = $2 and id = $3))`, secretID, userID, secretID)
 
 	if err != nil {
-		logger.Log.Error("Error deleting oldest secret version", zap.Error(err))
 		return err
 	}
 
@@ -745,7 +708,6 @@ func (r *PostgresRepository) RestoreSecretVersion(ctx context.Context, userID st
 	_, err := r.db.ExecContext(ctx, "update secrets set current_secret_version_id = $1 where user_id = $2 and id = $3", secretVersionID, userID, secretID)
 
 	if err != nil {
-		logger.Log.Error("Error restoring secret Version", zap.Error(err))
 		return err
 	}
 
@@ -767,7 +729,6 @@ func (r *PostgresRepository) GetAttachmentByID(ctx context.Context, userID strin
 
 	// Ошибка получения вложения по его ID
 	if err != nil {
-		logger.Log.Error("Error getting attachment by id", zap.Error(err))
 		return nil, err
 	}
 
@@ -783,7 +744,6 @@ func (r *PostgresRepository) GetAttachmentsBySecretID(ctx context.Context, userI
 
 	// Ошибка получения всех вложений по ID секрета
 	if err != nil {
-		logger.Log.Error("Error getting attachments by secret id", zap.Error(err))
 		return nil, err
 	}
 
@@ -799,14 +759,12 @@ func (r *PostgresRepository) GetAttachmentsBySecretID(ctx context.Context, userI
 		err := rows.Scan(&summary.ID, &summary.SecretVersionID, &summary.DataFormatVersion, &summary.InfoFormatVersion,
 			&summary.InfoEncrypted, &summary.InfoSize, &summary.DataSize, &summary.CreatedAt)
 		if err != nil {
-			logger.Log.Error("Error scanning attachment", zap.Error(err))
 			return nil, err
 		}
 		attachments = append(attachments, &summary)
 	}
 
 	if err = rows.Err(); err != nil {
-		logger.Log.Error("Error getting attachments by secret id", zap.Error(err))
 		return nil, err
 	}
 
@@ -823,7 +781,6 @@ func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context
 
 	// Ошибка получения всех вложений по ID версии секрета
 	if err != nil {
-		logger.Log.Error("Error getting attachments by secret version id", zap.Error(err))
 		return nil, err
 	}
 
@@ -839,7 +796,6 @@ func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context
 		err := rows.Scan(&summary.ID, &summary.SecretVersionID, &summary.DataFormatVersion, &summary.InfoFormatVersion,
 			&summary.InfoEncrypted, &summary.InfoSize, &summary.DataSize, &summary.CreatedAt)
 		if err != nil {
-			logger.Log.Error("Error scanning attachment", zap.Error(err))
 			return nil, err
 		}
 		attachments = append(attachments, &summary)
@@ -847,7 +803,6 @@ func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context
 
 	// Ошибка получения всех вложений по ID версии секрета
 	if err = rows.Err(); err != nil {
-		logger.Log.Error("Error getting attachments by secret version id", zap.Error(err))
 		return nil, err
 	}
 
@@ -866,7 +821,6 @@ func (r *PostgresRepository) CreateAttachment(ctx context.Context, userID string
 
 	// Ошибка создания вложения
 	if err != nil {
-		logger.Log.Error("Error creating attachment", zap.Error(err))
 		return nil, err
 	}
 
@@ -881,7 +835,6 @@ func (r *PostgresRepository) HardDeleteAttachment(ctx context.Context, userID st
 
 	// Ошибка удаления вложения
 	if err != nil {
-		logger.Log.Error("Error deleting attachment", zap.Error(err))
 		return err
 	}
 

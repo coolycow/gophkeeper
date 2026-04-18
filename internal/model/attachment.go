@@ -15,27 +15,27 @@ type AttachmentInfo struct {
 
 // Attachment полное вложение с телом файла (выдача по id, создание).
 type Attachment struct {
-	ID                string    `json:"id"`                  // ID вложения
-	SecretVersionID   string    `json:"secret_version_id"`   // ID версии секрета
-	DataFormatVersion int       `json:"data_format_version"` // версия формата данных
-	InfoFormatVersion int       `json:"info_format_version"` // версия формата метаданных
-	InfoEncrypted     []byte    `json:"info_encrypted"`      // зашифрованные метаданные
-	InfoSize          int       `json:"info_size"`           // размер метаданных
-	DataEncrypted     []byte    `json:"data_encrypted"`      // зашифрованные данные
-	DataSize          int       `json:"data_size"`           // размер данных
-	CreatedAt         time.Time `json:"created_at,omitempty"`
+	ID                string     `json:"id"`                  // ID вложения
+	SecretVersionID   string     `json:"secret_version_id"`   // ID версии секрета
+	DataFormatVersion int        `json:"data_format_version"` // версия формата данных
+	InfoFormatVersion int        `json:"info_format_version"` // версия формата метаданных
+	InfoEncrypted     []byte     `json:"info_encrypted"`      // зашифрованные метаданные
+	InfoSize          int        `json:"info_size"`           // размер метаданных
+	DataEncrypted     []byte     `json:"data_encrypted"`      // зашифрованные данные
+	DataSize          int        `json:"data_size"`           // размер данных
+	CreatedAt         *time.Time `json:"created_at,omitempty"`
 }
 
 // AttachmentSummary вложение без тела (data_encrypted): списки, построение UI по зашифрованным метаданным.
 type AttachmentSummary struct {
-	ID                string    `json:"id"`                   // ID вложения
-	SecretVersionID   string    `json:"secret_version_id"`    // ID версии секрета
-	DataFormatVersion int       `json:"data_format_version"`  // версия формата данных
-	InfoFormatVersion int       `json:"info_format_version"`  // версия формата метаданных
-	InfoEncrypted     []byte    `json:"info_encrypted"`       // зашифрованные метаданные
-	InfoSize          int       `json:"info_size"`            // размер метаданных
-	DataSize          int       `json:"data_size"`            // размер данных
-	CreatedAt         time.Time `json:"created_at,omitempty"` // время создания вложения
+	ID                string     `json:"id"`                   // ID вложения
+	SecretVersionID   string     `json:"secret_version_id"`    // ID версии секрета
+	DataFormatVersion int        `json:"data_format_version"`  // версия формата данных
+	InfoFormatVersion int        `json:"info_format_version"`  // версия формата метаданных
+	InfoEncrypted     []byte     `json:"info_encrypted"`       // зашифрованные метаданные
+	InfoSize          int        `json:"info_size"`            // размер метаданных
+	DataSize          int        `json:"data_size"`            // размер данных
+	CreatedAt         *time.Time `json:"created_at,omitempty"` // время создания вложения
 }
 
 // AttachmentCreateRequest создание вложения (поля ciphertext заполняет клиент).
