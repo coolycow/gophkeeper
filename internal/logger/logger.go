@@ -3,6 +3,7 @@ package logger
 
 import (
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Log будет доступен всему коду как синглтон.
@@ -20,6 +21,10 @@ func Initialize(level string) error {
 
 	// создаём новую конфигурацию логера
 	cfg := zap.NewProductionConfig()
+
+	// человекочитаемый вывод в консоль с цветным уровнем (ANSI)
+	cfg.Encoding = "console"
+	cfg.EncoderConfig.EncodeLevel = zapcore.LowercaseColorLevelEncoder
 
 	// устанавливаем уровень
 	cfg.Level = lvl
