@@ -1,5 +1,6 @@
 // Контракт публичного API GophKeeper по gRPC.
-// Смысл полей совпадает с доменными моделями в internal/model (секреты и вложения на сервере хранятся в зашифрованном виде — сервер не расшифровывает).
+// Смысл полей совпадает с доменными моделями в internal/model.
+//
 //
 // Генерация Go-кода (выполнять из корня модуля github.com/coolycow/gophkeeper):
 //  1) Установить protoc: https://github.com/protocolbuffers/protobuf/releases (нужен каталог include с google/protobuf/*.proto).
@@ -35,60 +36,56 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Условный «тип» секрета для фильтрации в UI; сами секреты на сервере — непрозрачный blob.
-type SecretKind int32
+// Область выборки для ListSecrets: активные, только корзина (мягко удалённые) или все.
+type SecretListScope int32
 
 const (
-	// Значение по умолчанию — если клиент не задаёт тип явно.
-	SecretKind_SECRET_KIND_UNSPECIFIED    SecretKind = 0
-	SecretKind_SECRET_KIND_LOGIN_PASSWORD SecretKind = 1
-	SecretKind_SECRET_KIND_TEXT           SecretKind = 2
-	SecretKind_SECRET_KIND_BINARY         SecretKind = 3
-	SecretKind_SECRET_KIND_BANK_CARD      SecretKind = 4
+	SecretListScope_SECRET_LIST_SCOPE_UNSPECIFIED  SecretListScope = 0
+	SecretListScope_SECRET_LIST_SCOPE_ACTIVE_ONLY  SecretListScope = 1
+	SecretListScope_SECRET_LIST_SCOPE_DELETED_ONLY SecretListScope = 2
+	SecretListScope_SECRET_LIST_SCOPE_ALL          SecretListScope = 3
 )
 
-// Enum value maps for SecretKind.
+// Enum value maps for SecretListScope.
 var (
-	SecretKind_name = map[int32]string{
-		0: "SECRET_KIND_UNSPECIFIED",
-		1: "SECRET_KIND_LOGIN_PASSWORD",
-		2: "SECRET_KIND_TEXT",
-		3: "SECRET_KIND_BINARY",
-		4: "SECRET_KIND_BANK_CARD",
+	SecretListScope_name = map[int32]string{
+		0: "SECRET_LIST_SCOPE_UNSPECIFIED",
+		1: "SECRET_LIST_SCOPE_ACTIVE_ONLY",
+		2: "SECRET_LIST_SCOPE_DELETED_ONLY",
+		3: "SECRET_LIST_SCOPE_ALL",
 	}
-	SecretKind_value = map[string]int32{
-		"SECRET_KIND_UNSPECIFIED":    0,
-		"SECRET_KIND_LOGIN_PASSWORD": 1,
-		"SECRET_KIND_TEXT":           2,
-		"SECRET_KIND_BINARY":         3,
-		"SECRET_KIND_BANK_CARD":      4,
+	SecretListScope_value = map[string]int32{
+		"SECRET_LIST_SCOPE_UNSPECIFIED":  0,
+		"SECRET_LIST_SCOPE_ACTIVE_ONLY":  1,
+		"SECRET_LIST_SCOPE_DELETED_ONLY": 2,
+		"SECRET_LIST_SCOPE_ALL":          3,
 	}
 )
 
-func (x SecretKind) Enum() *SecretKind {
-	p := new(SecretKind)
+func (x SecretListScope) Enum() *SecretListScope {
+	p := new(SecretListScope)
 	*p = x
 	return p
 }
 
-func (x SecretKind) String() string {
+func (x SecretListScope) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (SecretKind) Descriptor() protoreflect.EnumDescriptor {
+func (SecretListScope) Descriptor() protoreflect.EnumDescriptor {
 	return file_gophkeeper_proto_enumTypes[0].Descriptor()
 }
 
-func (SecretKind) Type() protoreflect.EnumType {
+func (SecretListScope) Type() protoreflect.EnumType {
 	return &file_gophkeeper_proto_enumTypes[0]
 }
 
-func (x SecretKind) Number() protoreflect.EnumNumber {
+func (x SecretListScope) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use SecretKind.Descriptor instead.
-func (SecretKind) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use SecretListScope.Descriptor instead.
+func (SecretListScope) EnumDescriptor() ([]byte, []int) {
 	return file_gophkeeper_proto_rawDescGZIP(), []int{0}
 }
 
@@ -254,8 +251,7 @@ func (*DeleteAttachmentResponse) Descriptor() ([]byte, []int) {
 type RegisterRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Email пользователя (уникален на сервере).
-	Email string `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
-	// Пароль в открытом виде только в этом запросе по сети; дальше используйте TLS.
+	Email         string `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Password      string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -404,10 +400,8 @@ func (x *RefreshTokenRequest) GetRefreshToken() string {
 
 // Ответ с токенами (как в model.AuthResponse).
 type AuthResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Соль пользователя (для клиентского KDF и повторного входа).
-	Salt string `protobuf:"bytes,1,opt,name=salt,proto3" json:"salt,omitempty"`
-	// JWT или иной access-токен для последующих RPC.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Salt          string                 `protobuf:"bytes,1,opt,name=salt,proto3" json:"salt,omitempty"`
 	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
 	RefreshToken  string                 `protobuf:"bytes,3,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
 	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
@@ -479,8 +473,8 @@ type SecretSummary struct {
 	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	CurrentSecretVersionId string                 `protobuf:"bytes,2,opt,name=current_secret_version_id,json=currentSecretVersionId,proto3" json:"current_secret_version_id,omitempty"`
 	UpdatedAt              *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	// Необязательная подсказка для UI; детали могут быть только внутри ciphertext.
-	Kind          SecretKind `protobuf:"varint,4,opt,name=kind,proto3,enum=gophkeeper.v1.SecretKind" json:"kind,omitempty"`
+	// Для записей в корзине (мягкое удаление); для активных не задаётся.
+	DeletedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -536,17 +530,16 @@ func (x *SecretSummary) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *SecretSummary) GetKind() SecretKind {
+func (x *SecretSummary) GetDeletedAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.Kind
+		return x.DeletedAt
 	}
-	return SecretKind_SECRET_KIND_UNSPECIFIED
+	return nil
 }
 
 type ListSecretsRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Зарезервировано под фильтры/пагинацию; пока можно оставить пустым.
-	FilterKind    SecretKind `protobuf:"varint,1,opt,name=filter_kind,json=filterKind,proto3,enum=gophkeeper.v1.SecretKind" json:"filter_kind,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ListScope     SecretListScope        `protobuf:"varint,1,opt,name=list_scope,json=listScope,proto3,enum=gophkeeper.v1.SecretListScope" json:"list_scope,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -581,11 +574,11 @@ func (*ListSecretsRequest) Descriptor() ([]byte, []int) {
 	return file_gophkeeper_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *ListSecretsRequest) GetFilterKind() SecretKind {
+func (x *ListSecretsRequest) GetListScope() SecretListScope {
 	if x != nil {
-		return x.FilterKind
+		return x.ListScope
 	}
-	return SecretKind_SECRET_KIND_UNSPECIFIED
+	return SecretListScope_SECRET_LIST_SCOPE_UNSPECIFIED
 }
 
 type ListSecretsResponse struct {
@@ -633,10 +626,9 @@ func (x *ListSecretsResponse) GetSecrets() []*SecretSummary {
 }
 
 type GetSecretRequest struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	SecretId string                 `protobuf:"bytes,1,opt,name=secret_id,json=secretId,proto3" json:"secret_id,omitempty"`
-	// Если true — сервер может вернуть в ответе Secret.secret_versions (тяжелее по данным).
-	IncludeVersionHistory bool `protobuf:"varint,2,opt,name=include_version_history,json=includeVersionHistory,proto3" json:"include_version_history,omitempty"`
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	SecretId              string                 `protobuf:"bytes,1,opt,name=secret_id,json=secretId,proto3" json:"secret_id,omitempty"`
+	IncludeVersionHistory bool                   `protobuf:"varint,2,opt,name=include_version_history,json=includeVersionHistory,proto3" json:"include_version_history,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -792,14 +784,13 @@ type SecretVersion struct {
 	SecretId          string                 `protobuf:"bytes,2,opt,name=secret_id,json=secretId,proto3" json:"secret_id,omitempty"`
 	Version           int32                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
 	DataFormatVersion int32                  `protobuf:"varint,4,opt,name=data_format_version,json=dataFormatVersion,proto3" json:"data_format_version,omitempty"`
-	// Зашифрованная полезная нагрузка (сервер хранит как есть).
-	DataEncrypted []byte                 `protobuf:"bytes,5,opt,name=data_encrypted,json=dataEncrypted,proto3" json:"data_encrypted,omitempty"`
-	DataSize      int32                  `protobuf:"varint,6,opt,name=data_size,json=dataSize,proto3" json:"data_size,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	DeletedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	DataEncrypted     []byte                 `protobuf:"bytes,5,opt,name=data_encrypted,json=dataEncrypted,proto3" json:"data_encrypted,omitempty"`
+	DataSize          int32                  `protobuf:"varint,6,opt,name=data_size,json=dataSize,proto3" json:"data_size,omitempty"`
+	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt         *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	DeletedAt         *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SecretVersion) Reset() {
@@ -896,11 +887,9 @@ func (x *SecretVersion) GetDeletedAt() *timestamppb.Timestamp {
 }
 
 type CreateSecretRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Первая версия: только ciphertext и номер формата (как SecretCreateRequest в model).
-	DataEncrypted     []byte     `protobuf:"bytes,1,opt,name=data_encrypted,json=dataEncrypted,proto3" json:"data_encrypted,omitempty"`
-	DataFormatVersion int32      `protobuf:"varint,2,opt,name=data_format_version,json=dataFormatVersion,proto3" json:"data_format_version,omitempty"`
-	Kind              SecretKind `protobuf:"varint,3,opt,name=kind,proto3,enum=gophkeeper.v1.SecretKind" json:"kind,omitempty"`
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	DataEncrypted     []byte                 `protobuf:"bytes,1,opt,name=data_encrypted,json=dataEncrypted,proto3" json:"data_encrypted,omitempty"`
+	DataFormatVersion int32                  `protobuf:"varint,2,opt,name=data_format_version,json=dataFormatVersion,proto3" json:"data_format_version,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -947,13 +936,6 @@ func (x *CreateSecretRequest) GetDataFormatVersion() int32 {
 		return x.DataFormatVersion
 	}
 	return 0
-}
-
-func (x *CreateSecretRequest) GetKind() SecretKind {
-	if x != nil {
-		return x.Kind
-	}
-	return SecretKind_SECRET_KIND_UNSPECIFIED
 }
 
 type UpdateSecretRequest struct {
@@ -1410,8 +1392,6 @@ func (x *Attachment) GetCreatedAt() *timestamppb.Timestamp {
 
 type ListAttachmentsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Либо версия секрета, либо id секрета — в зависимости от того, как удобнее репозиторию.
-	//
 	// Types that are valid to be assigned to Scope:
 	//
 	//	*ListAttachmentsRequest_SecretId
@@ -1723,16 +1703,17 @@ const file_gophkeeper_proto_rawDesc = "" +
 	"\x05token\x18\x02 \x01(\tR\x05token\x12#\n" +
 	"\rrefresh_token\x18\x03 \x01(\tR\frefreshToken\x129\n" +
 	"\n" +
-	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xc4\x01\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xd0\x01\n" +
 	"\rSecretSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x129\n" +
 	"\x19current_secret_version_id\x18\x02 \x01(\tR\x16currentSecretVersionId\x129\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12-\n" +
-	"\x04kind\x18\x04 \x01(\x0e2\x19.gophkeeper.v1.SecretKindR\x04kind\"P\n" +
-	"\x12ListSecretsRequest\x12:\n" +
-	"\vfilter_kind\x18\x01 \x01(\x0e2\x19.gophkeeper.v1.SecretKindR\n" +
-	"filterKind\"M\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
+	"\n" +
+	"deleted_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tdeletedAt\"S\n" +
+	"\x12ListSecretsRequest\x12=\n" +
+	"\n" +
+	"list_scope\x18\x01 \x01(\x0e2\x1e.gophkeeper.v1.SecretListScopeR\tlistScope\"M\n" +
 	"\x13ListSecretsResponse\x126\n" +
 	"\asecrets\x18\x01 \x03(\v2\x1c.gophkeeper.v1.SecretSummaryR\asecrets\"g\n" +
 	"\x10GetSecretRequest\x12\x1b\n" +
@@ -1762,11 +1743,10 @@ const file_gophkeeper_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
 	"\n" +
-	"deleted_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tdeletedAt\"\x9b\x01\n" +
+	"deleted_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tdeletedAt\"l\n" +
 	"\x13CreateSecretRequest\x12%\n" +
 	"\x0edata_encrypted\x18\x01 \x01(\fR\rdataEncrypted\x12.\n" +
-	"\x13data_format_version\x18\x02 \x01(\x05R\x11dataFormatVersion\x12-\n" +
-	"\x04kind\x18\x03 \x01(\x0e2\x19.gophkeeper.v1.SecretKindR\x04kind\"\x89\x01\n" +
+	"\x13data_format_version\x18\x02 \x01(\x05R\x11dataFormatVersion\"\x89\x01\n" +
 	"\x13UpdateSecretRequest\x12\x1b\n" +
 	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12%\n" +
 	"\x0edata_encrypted\x18\x02 \x01(\fR\rdataEncrypted\x12.\n" +
@@ -1817,14 +1797,12 @@ const file_gophkeeper_proto_rawDesc = "" +
 	"\x0einfo_encrypted\x18\x04 \x01(\fR\rinfoEncrypted\x12%\n" +
 	"\x0edata_encrypted\x18\x05 \x01(\fR\rdataEncrypted\">\n" +
 	"\x17DeleteAttachmentRequest\x12#\n" +
-	"\rattachment_id\x18\x01 \x01(\tR\fattachmentId*\x92\x01\n" +
-	"\n" +
-	"SecretKind\x12\x1b\n" +
-	"\x17SECRET_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
-	"\x1aSECRET_KIND_LOGIN_PASSWORD\x10\x01\x12\x14\n" +
-	"\x10SECRET_KIND_TEXT\x10\x02\x12\x16\n" +
-	"\x12SECRET_KIND_BINARY\x10\x03\x12\x19\n" +
-	"\x15SECRET_KIND_BANK_CARD\x10\x042\xf6\t\n" +
+	"\rattachment_id\x18\x01 \x01(\tR\fattachmentId*\x96\x01\n" +
+	"\x0fSecretListScope\x12!\n" +
+	"\x1dSECRET_LIST_SCOPE_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dSECRET_LIST_SCOPE_ACTIVE_ONLY\x10\x01\x12\"\n" +
+	"\x1eSECRET_LIST_SCOPE_DELETED_ONLY\x10\x02\x12\x19\n" +
+	"\x15SECRET_LIST_SCOPE_ALL\x10\x032\xf6\t\n" +
 	"\x11GophKeeperService\x12?\n" +
 	"\x04Ping\x12\x1a.gophkeeper.v1.PingRequest\x1a\x1b.gophkeeper.v1.PingResponse\x12G\n" +
 	"\bRegister\x12\x1e.gophkeeper.v1.RegisterRequest\x1a\x1b.gophkeeper.v1.AuthResponse\x12A\n" +
@@ -1857,7 +1835,7 @@ func file_gophkeeper_proto_rawDescGZIP() []byte {
 var file_gophkeeper_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_gophkeeper_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_gophkeeper_proto_goTypes = []any{
-	(SecretKind)(0),                    // 0: gophkeeper.v1.SecretKind
+	(SecretListScope)(0),               // 0: gophkeeper.v1.SecretListScope
 	(*PingRequest)(nil),                // 1: gophkeeper.v1.PingRequest
 	(*PingResponse)(nil),               // 2: gophkeeper.v1.PingResponse
 	(*DeleteSecretResponse)(nil),       // 3: gophkeeper.v1.DeleteSecretResponse
@@ -1890,8 +1868,8 @@ var file_gophkeeper_proto_goTypes = []any{
 var file_gophkeeper_proto_depIdxs = []int32{
 	28, // 0: gophkeeper.v1.AuthResponse.expires_at:type_name -> google.protobuf.Timestamp
 	28, // 1: gophkeeper.v1.SecretSummary.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 2: gophkeeper.v1.SecretSummary.kind:type_name -> gophkeeper.v1.SecretKind
-	0,  // 3: gophkeeper.v1.ListSecretsRequest.filter_kind:type_name -> gophkeeper.v1.SecretKind
+	28, // 2: gophkeeper.v1.SecretSummary.deleted_at:type_name -> google.protobuf.Timestamp
+	0,  // 3: gophkeeper.v1.ListSecretsRequest.list_scope:type_name -> gophkeeper.v1.SecretListScope
 	9,  // 4: gophkeeper.v1.ListSecretsResponse.secrets:type_name -> gophkeeper.v1.SecretSummary
 	28, // 5: gophkeeper.v1.Secret.created_at:type_name -> google.protobuf.Timestamp
 	28, // 6: gophkeeper.v1.Secret.updated_at:type_name -> google.protobuf.Timestamp
@@ -1901,46 +1879,45 @@ var file_gophkeeper_proto_depIdxs = []int32{
 	28, // 10: gophkeeper.v1.SecretVersion.created_at:type_name -> google.protobuf.Timestamp
 	28, // 11: gophkeeper.v1.SecretVersion.updated_at:type_name -> google.protobuf.Timestamp
 	28, // 12: gophkeeper.v1.SecretVersion.deleted_at:type_name -> google.protobuf.Timestamp
-	0,  // 13: gophkeeper.v1.CreateSecretRequest.kind:type_name -> gophkeeper.v1.SecretKind
-	14, // 14: gophkeeper.v1.ListSecretVersionsResponse.versions:type_name -> gophkeeper.v1.SecretVersion
-	28, // 15: gophkeeper.v1.AttachmentSummary.created_at:type_name -> google.protobuf.Timestamp
-	28, // 16: gophkeeper.v1.Attachment.created_at:type_name -> google.protobuf.Timestamp
-	21, // 17: gophkeeper.v1.ListAttachmentsResponse.attachments:type_name -> gophkeeper.v1.AttachmentSummary
-	1,  // 18: gophkeeper.v1.GophKeeperService.Ping:input_type -> gophkeeper.v1.PingRequest
-	5,  // 19: gophkeeper.v1.GophKeeperService.Register:input_type -> gophkeeper.v1.RegisterRequest
-	6,  // 20: gophkeeper.v1.GophKeeperService.Login:input_type -> gophkeeper.v1.LoginRequest
-	7,  // 21: gophkeeper.v1.GophKeeperService.RefreshToken:input_type -> gophkeeper.v1.RefreshTokenRequest
-	10, // 22: gophkeeper.v1.GophKeeperService.ListSecrets:input_type -> gophkeeper.v1.ListSecretsRequest
-	12, // 23: gophkeeper.v1.GophKeeperService.GetSecret:input_type -> gophkeeper.v1.GetSecretRequest
-	15, // 24: gophkeeper.v1.GophKeeperService.CreateSecret:input_type -> gophkeeper.v1.CreateSecretRequest
-	16, // 25: gophkeeper.v1.GophKeeperService.UpdateSecret:input_type -> gophkeeper.v1.UpdateSecretRequest
-	17, // 26: gophkeeper.v1.GophKeeperService.DeleteSecret:input_type -> gophkeeper.v1.DeleteSecretRequest
-	18, // 27: gophkeeper.v1.GophKeeperService.ListSecretVersions:input_type -> gophkeeper.v1.ListSecretVersionsRequest
-	20, // 28: gophkeeper.v1.GophKeeperService.GetSecretVersion:input_type -> gophkeeper.v1.GetSecretVersionRequest
-	23, // 29: gophkeeper.v1.GophKeeperService.ListAttachments:input_type -> gophkeeper.v1.ListAttachmentsRequest
-	25, // 30: gophkeeper.v1.GophKeeperService.GetAttachment:input_type -> gophkeeper.v1.GetAttachmentRequest
-	26, // 31: gophkeeper.v1.GophKeeperService.CreateAttachment:input_type -> gophkeeper.v1.CreateAttachmentRequest
-	27, // 32: gophkeeper.v1.GophKeeperService.DeleteAttachment:input_type -> gophkeeper.v1.DeleteAttachmentRequest
-	2,  // 33: gophkeeper.v1.GophKeeperService.Ping:output_type -> gophkeeper.v1.PingResponse
-	8,  // 34: gophkeeper.v1.GophKeeperService.Register:output_type -> gophkeeper.v1.AuthResponse
-	8,  // 35: gophkeeper.v1.GophKeeperService.Login:output_type -> gophkeeper.v1.AuthResponse
-	8,  // 36: gophkeeper.v1.GophKeeperService.RefreshToken:output_type -> gophkeeper.v1.AuthResponse
-	11, // 37: gophkeeper.v1.GophKeeperService.ListSecrets:output_type -> gophkeeper.v1.ListSecretsResponse
-	13, // 38: gophkeeper.v1.GophKeeperService.GetSecret:output_type -> gophkeeper.v1.Secret
-	13, // 39: gophkeeper.v1.GophKeeperService.CreateSecret:output_type -> gophkeeper.v1.Secret
-	14, // 40: gophkeeper.v1.GophKeeperService.UpdateSecret:output_type -> gophkeeper.v1.SecretVersion
-	3,  // 41: gophkeeper.v1.GophKeeperService.DeleteSecret:output_type -> gophkeeper.v1.DeleteSecretResponse
-	19, // 42: gophkeeper.v1.GophKeeperService.ListSecretVersions:output_type -> gophkeeper.v1.ListSecretVersionsResponse
-	14, // 43: gophkeeper.v1.GophKeeperService.GetSecretVersion:output_type -> gophkeeper.v1.SecretVersion
-	24, // 44: gophkeeper.v1.GophKeeperService.ListAttachments:output_type -> gophkeeper.v1.ListAttachmentsResponse
-	22, // 45: gophkeeper.v1.GophKeeperService.GetAttachment:output_type -> gophkeeper.v1.Attachment
-	22, // 46: gophkeeper.v1.GophKeeperService.CreateAttachment:output_type -> gophkeeper.v1.Attachment
-	4,  // 47: gophkeeper.v1.GophKeeperService.DeleteAttachment:output_type -> gophkeeper.v1.DeleteAttachmentResponse
-	33, // [33:48] is the sub-list for method output_type
-	18, // [18:33] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	14, // 13: gophkeeper.v1.ListSecretVersionsResponse.versions:type_name -> gophkeeper.v1.SecretVersion
+	28, // 14: gophkeeper.v1.AttachmentSummary.created_at:type_name -> google.protobuf.Timestamp
+	28, // 15: gophkeeper.v1.Attachment.created_at:type_name -> google.protobuf.Timestamp
+	21, // 16: gophkeeper.v1.ListAttachmentsResponse.attachments:type_name -> gophkeeper.v1.AttachmentSummary
+	1,  // 17: gophkeeper.v1.GophKeeperService.Ping:input_type -> gophkeeper.v1.PingRequest
+	5,  // 18: gophkeeper.v1.GophKeeperService.Register:input_type -> gophkeeper.v1.RegisterRequest
+	6,  // 19: gophkeeper.v1.GophKeeperService.Login:input_type -> gophkeeper.v1.LoginRequest
+	7,  // 20: gophkeeper.v1.GophKeeperService.RefreshToken:input_type -> gophkeeper.v1.RefreshTokenRequest
+	10, // 21: gophkeeper.v1.GophKeeperService.ListSecrets:input_type -> gophkeeper.v1.ListSecretsRequest
+	12, // 22: gophkeeper.v1.GophKeeperService.GetSecret:input_type -> gophkeeper.v1.GetSecretRequest
+	15, // 23: gophkeeper.v1.GophKeeperService.CreateSecret:input_type -> gophkeeper.v1.CreateSecretRequest
+	16, // 24: gophkeeper.v1.GophKeeperService.UpdateSecret:input_type -> gophkeeper.v1.UpdateSecretRequest
+	17, // 25: gophkeeper.v1.GophKeeperService.DeleteSecret:input_type -> gophkeeper.v1.DeleteSecretRequest
+	18, // 26: gophkeeper.v1.GophKeeperService.ListSecretVersions:input_type -> gophkeeper.v1.ListSecretVersionsRequest
+	20, // 27: gophkeeper.v1.GophKeeperService.GetSecretVersion:input_type -> gophkeeper.v1.GetSecretVersionRequest
+	23, // 28: gophkeeper.v1.GophKeeperService.ListAttachments:input_type -> gophkeeper.v1.ListAttachmentsRequest
+	25, // 29: gophkeeper.v1.GophKeeperService.GetAttachment:input_type -> gophkeeper.v1.GetAttachmentRequest
+	26, // 30: gophkeeper.v1.GophKeeperService.CreateAttachment:input_type -> gophkeeper.v1.CreateAttachmentRequest
+	27, // 31: gophkeeper.v1.GophKeeperService.DeleteAttachment:input_type -> gophkeeper.v1.DeleteAttachmentRequest
+	2,  // 32: gophkeeper.v1.GophKeeperService.Ping:output_type -> gophkeeper.v1.PingResponse
+	8,  // 33: gophkeeper.v1.GophKeeperService.Register:output_type -> gophkeeper.v1.AuthResponse
+	8,  // 34: gophkeeper.v1.GophKeeperService.Login:output_type -> gophkeeper.v1.AuthResponse
+	8,  // 35: gophkeeper.v1.GophKeeperService.RefreshToken:output_type -> gophkeeper.v1.AuthResponse
+	11, // 36: gophkeeper.v1.GophKeeperService.ListSecrets:output_type -> gophkeeper.v1.ListSecretsResponse
+	13, // 37: gophkeeper.v1.GophKeeperService.GetSecret:output_type -> gophkeeper.v1.Secret
+	13, // 38: gophkeeper.v1.GophKeeperService.CreateSecret:output_type -> gophkeeper.v1.Secret
+	14, // 39: gophkeeper.v1.GophKeeperService.UpdateSecret:output_type -> gophkeeper.v1.SecretVersion
+	3,  // 40: gophkeeper.v1.GophKeeperService.DeleteSecret:output_type -> gophkeeper.v1.DeleteSecretResponse
+	19, // 41: gophkeeper.v1.GophKeeperService.ListSecretVersions:output_type -> gophkeeper.v1.ListSecretVersionsResponse
+	14, // 42: gophkeeper.v1.GophKeeperService.GetSecretVersion:output_type -> gophkeeper.v1.SecretVersion
+	24, // 43: gophkeeper.v1.GophKeeperService.ListAttachments:output_type -> gophkeeper.v1.ListAttachmentsResponse
+	22, // 44: gophkeeper.v1.GophKeeperService.GetAttachment:output_type -> gophkeeper.v1.Attachment
+	22, // 45: gophkeeper.v1.GophKeeperService.CreateAttachment:output_type -> gophkeeper.v1.Attachment
+	4,  // 46: gophkeeper.v1.GophKeeperService.DeleteAttachment:output_type -> gophkeeper.v1.DeleteAttachmentResponse
+	32, // [32:47] is the sub-list for method output_type
+	17, // [17:32] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_gophkeeper_proto_init() }

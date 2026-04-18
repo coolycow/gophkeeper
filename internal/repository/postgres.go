@@ -260,9 +260,25 @@ func (r *PostgresRepository) GetSecretByID(ctx context.Context, secretID string)
 	return &secret, nil
 }
 
-// GetSecretsByUserID получает все секреты пользователя
-func (r *PostgresRepository) GetSecretsByUserID(ctx context.Context, userID string) ([]*model.Secret, error) {
-	rows, err := r.db.QueryContext(ctx, "select id, user_id, current_secret_version_id, created_at, updated_at, deleted_at from secrets where user_id = $1", userID)
+// GetSecretsByUserID получает секреты пользователя: активные (deleted_at IS NULL), корзину (мягко удалённые) или все.
+func (r *PostgresRepository) GetSecretsByUserID(ctx context.Context, userID string, scope model.SecretListScope) ([]*model.Secret, error) {
+	// Строим запрос в зависимости от scope
+	q := "select id, user_id, current_secret_version_id, created_at, updated_at, deleted_at from secrets where user_id = $1"
+
+	// Добавляем фильтр в зависимости от scope
+	switch scope {
+	case model.SecretListScopeActiveOnly, model.SecretListScopeUnspecified:
+		q += " and deleted_at is null"
+	case model.SecretListScopeDeletedOnly:
+		q += " and deleted_at is not null"
+	case model.SecretListScopeAll:
+		// без фильтра по deleted_at
+	default:
+		q += " and deleted_at is null"
+	}
+
+	// Выполняем запрос
+	rows, err := r.db.QueryContext(ctx, q, userID)
 
 	if err != nil {
 		logger.Log.Error("Error getting secrets by user id", zap.Error(err))

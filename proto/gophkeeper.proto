@@ -93,16 +93,6 @@ message DeleteSecretResponse {}
 // Ответ на удаление вложения — отдельный тип для независимого расширения.
 message DeleteAttachmentResponse {}
 
-// Условный «тип» секрета для фильтрации в UI; сами секреты на сервере — непрозрачный blob.
-enum SecretKind {
-  // Значение по умолчанию — если клиент не задаёт тип явно.
-  SECRET_KIND_UNSPECIFIED = 0;
-  SECRET_KIND_LOGIN_PASSWORD = 1;
-  SECRET_KIND_TEXT = 2;
-  SECRET_KIND_BINARY = 3;
-  SECRET_KIND_BANK_CARD = 4;
-}
-
 // -----------------------------------------------------------------------------
 // Аутентификация
 // -----------------------------------------------------------------------------
@@ -135,16 +125,25 @@ message AuthResponse {
 // Секреты
 // -----------------------------------------------------------------------------
 
+// Область выборки для ListSecrets: активные, только корзина (мягко удалённые) или все.
+enum SecretListScope {
+  SECRET_LIST_SCOPE_UNSPECIFIED = 0;
+  SECRET_LIST_SCOPE_ACTIVE_ONLY = 1;
+  SECRET_LIST_SCOPE_DELETED_ONLY = 2;
+  SECRET_LIST_SCOPE_ALL = 3;
+}
+
 // Краткая информация о секрете для списков и синхронизации.
 message SecretSummary {
   string id = 1;
   string current_secret_version_id = 2;
   google.protobuf.Timestamp updated_at = 3;
-  SecretKind kind = 4;
+  // Для записей в корзине (мягкое удаление); для активных не задаётся.
+  google.protobuf.Timestamp deleted_at = 4;
 }
 
 message ListSecretsRequest {
-  SecretKind filter_kind = 1;
+  SecretListScope list_scope = 1;
 }
 
 message ListSecretsResponse {
@@ -183,7 +182,6 @@ message SecretVersion {
 message CreateSecretRequest {
   bytes data_encrypted = 1;
   int32 data_format_version = 2;
-  SecretKind kind = 3;
 }
 
 message UpdateSecretRequest {

@@ -15,7 +15,8 @@ type Secret struct {
 
 // SecretCreateRequest модель создания секрета
 type SecretCreateRequest struct {
-	DataEncrypted []byte `json:"encrypted_data,omitempty"` // зашифрованные данные
+	DataEncrypted       []byte `json:"encrypted_data,omitempty"` // зашифрованные данные
+	DataFormatVersion   int    `json:"data_format_version,omitempty"` // версия формата (gRPC / API)
 }
 
 // SecretUpdateRequest модель обновления секрета

@@ -1,5 +1,6 @@
 // Контракт публичного API GophKeeper по gRPC.
-// Смысл полей совпадает с доменными моделями в internal/model (секреты и вложения на сервере хранятся в зашифрованном виде — сервер не расшифровывает).
+// Смысл полей совпадает с доменными моделями в internal/model.
+//
 //
 // Генерация Go-кода (выполнять из корня модуля github.com/coolycow/gophkeeper):
 //  1) Установить protoc: https://github.com/protocolbuffers/protobuf/releases (нужен каталог include с google/protobuf/*.proto).

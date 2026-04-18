@@ -25,7 +25,7 @@ type GophKeeperRepository interface {
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С СЕКРЕТАМИ //////////////////////////////////////////////////////////////
 	GetSecretByID(ctx context.Context, secretID string) (*model.Secret, error)                               // получает секрет по его ID
-	GetSecretsByUserID(ctx context.Context, userID string) ([]*model.Secret, error)                          // получает все секреты пользователя
+	GetSecretsByUserID(ctx context.Context, userID string, scope model.SecretListScope) ([]*model.Secret, error) // список секретов: активные, корзина (мягко удалённые) или все
 	GetSecretByUserIDAndSecretID(ctx context.Context, userID string, secretID string) (*model.Secret, error) // получает секрет по его ID и ID пользователя
 	CreateSecret(ctx context.Context, userID string, secret *model.Secret) (*model.Secret, error)            // создает секрет
 	UpdateSecret(ctx context.Context, userID string, secretID string, secret *model.Secret) error            // обновляет секрет

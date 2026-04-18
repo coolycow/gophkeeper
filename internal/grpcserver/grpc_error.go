@@ -1,6 +1,7 @@
 package grpcserver
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 
@@ -36,4 +37,15 @@ func grpcError(err error) error {
 	}
 
 	return status.Errorf(codes.Internal, "%v", err)
+}
+
+// grpcErrorOrNotFound мапит sql.ErrNoRows в NotFound, остальное — через grpcError.
+func grpcErrorOrNotFound(err error, notFoundMsg string) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return status.Error(codes.NotFound, notFoundMsg)
+	}
+	return grpcError(err)
 }

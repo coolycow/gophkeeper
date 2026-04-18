@@ -109,7 +109,7 @@
 | `Register` | `…/Register` | Нет | Регистрация; тело: `email`, `password`. |
 | `Login` | `…/Login` | Нет | Вход; тело: `email`, `password`. |
 | `RefreshToken` | `…/RefreshToken` | Нет | Обновление сессии; тело: `refresh_token`. |
-| `ListSecrets` | `…/ListSecrets` | Да | Список секретов; тело: опционально `filter_kind` (`SecretKind`). |
+| `ListSecrets` | `…/ListSecrets` | Да | Список секретов; тело: `list_scope` — активные (`ACTIVE_ONLY` / по умолчанию), только корзина (`DELETED_ONLY`) или `ALL`. В `SecretSummary` для корзины заполнено `deleted_at`. |
 | `GetSecret` | `…/GetSecret` | Да | Один секрет; тело: `secret_id`, `include_version_history`. |
 | `CreateSecret` | `…/CreateSecret` | Да | Новый секрет; тело: `data_encrypted`, `data_format_version`, `kind`. |
 | `UpdateSecret` | `…/UpdateSecret` | Да | Новая версия; тело: `secret_id`, `data_encrypted`, `data_format_version`. |
@@ -121,7 +121,7 @@
 | `CreateAttachment` | `…/CreateAttachment` | Да | Загрузить вложение; тело: `secret_version_id`, форматы, `info_encrypted`, `data_encrypted`. |
 | `DeleteAttachment` | `…/DeleteAttachment` | Да | Удалить вложение; тело: `attachment_id`. |
 
-Типы полей и перечисление `SecretKind` описаны в [`proto/gophkeeper.proto`](proto/gophkeeper.proto).
+Типы полей и `SecretListScope` описаны в [`proto/gophkeeper.proto`](proto/gophkeeper.proto).
 
 ---
 
