@@ -74,13 +74,13 @@ func (c *ConfigServer) PrintConfig() {
 	var b strings.Builder
 
 	// Формируем строку с настройками
-	fmt.Fprintf(&b, "config: Host=%s Port=%d GrpcPort=%d", c.Host, c.Port, c.GrpcPort)
-	fmt.Fprintf(&b, "LogLevel=%s  DatabaseDSN=%s RunMigrations=%t ", c.LogLevel, c.DatabaseDSN, c.RunMigrations)
-	fmt.Fprintf(&b, "EnableHTTPS=%t TLSCertFile=%s TLSKeyFile=%s TrustedSubnet=%s Config=%s",
+	fmt.Fprintf(&b, "Host=%s Port=%d GrpcPort=%d; ", c.Host, c.Port, c.GrpcPort)
+	fmt.Fprintf(&b, "LogLevel=%s  DatabaseDSN=%s RunMigrations=%t; ", c.LogLevel, c.DatabaseDSN, c.RunMigrations)
+	fmt.Fprintf(&b, "EnableHTTPS=%t TLSCertFile=%s TLSKeyFile=%s TrustedSubnet=%s Config=%s; ",
 		c.EnableHTTPS, c.TLSCertFile, c.TLSKeyFile, c.TrustedSubnet, c.Config)
-	fmt.Fprintf(&b, "SecretVersionCount=%d", c.SecretVersionCount)
-	fmt.Fprintf(&b, "SaltLength=%d MinPasswordLength=%d MaxPasswordLength=%d", c.SaltLength, c.MinPasswordLength, c.MaxPasswordLength)
-	fmt.Fprintf(&b, "AuditFile=%s AuditURL=%s", c.AuditFile, c.AuditURL)
+	fmt.Fprintf(&b, "SecretVersionCount=%d; ", c.SecretVersionCount)
+	fmt.Fprintf(&b, "SaltLength=%d MinPasswordLength=%d MaxPasswordLength=%d; ", c.SaltLength, c.MinPasswordLength, c.MaxPasswordLength)
+	fmt.Fprintf(&b, "AuditFile=%s AuditURL=%s; ", c.AuditFile, c.AuditURL)
 	// Выводим настройки в лог
 	logger.Log.Info(b.String())
 }
@@ -358,6 +358,14 @@ func mergeConfigServerFromFile(cfg *ConfigServer, path string) error {
 		return fmt.Errorf("invalid config file %s: %w", path, err)
 	}
 
+	if fc.Host != nil {
+		cfg.Host = *fc.Host
+	}
+
+	if fc.Port != nil {
+		cfg.Port = *fc.Port
+	}
+
 	if fc.LogLevel != nil {
 		cfg.LogLevel = *fc.LogLevel
 	}
@@ -505,7 +513,7 @@ func getDefaultTLSKeyFile() string {
 
 // getDefaultConfigFile файл конфигурации по умолчанию
 func getDefaultConfigFile() string {
-	return "config.json"
+	return "config_server.json"
 }
 
 // getDefaultMinPasswordLength минимальная длина пароля

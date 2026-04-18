@@ -92,11 +92,15 @@ func (r *PostgresRepository) RunMigrations() error {
 
 // NewPostgresRepository создает новый экземпляр URLRepository
 func NewPostgresRepository(DSN string) (*PostgresRepository, error) {
+	// Открываем соединение с базой данных
 	db, err := sql.Open("pgx", DSN)
+
+	// Ошибка открытия соединения
 	if err != nil {
 		return nil, err
 	}
 
+	// Проверяем, доступна ли база данных
 	if err = db.Ping(); err != nil {
 		closeErr := db.Close()
 		if closeErr != nil {
@@ -107,12 +111,13 @@ func NewPostgresRepository(DSN string) (*PostgresRepository, error) {
 
 	repo := &PostgresRepository{db: db}
 
-	// Проверяем, существует ли таблица urls
-	tableExists, err := repo.checkTableExists("urls")
+	// Проверяем, существует ли таблица users
+	tableExists, err := repo.checkTableExists("users")
 	if err != nil {
 		return nil, err
 	}
 
+	// Если таблица users не существует, выполняем миграции, т.к. это явно первый запуск приложения на сервере
 	if !tableExists {
 		err = repo.RunMigrations()
 
