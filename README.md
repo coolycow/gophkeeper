@@ -71,9 +71,23 @@
 ### Подключение
 
 - **Адрес:** `HOST:GRPC_PORT` (тот же хост, что и у HTTP; порт из конфигурации).
-- **TLS:** если включён `ENABLE_HTTPS`, gRPC использует те же `TLS_CERT_FILE` / `TLS_KEY_FILE` — в Insomnia включите TLS и при self-signed укажите доверие к сертификату или отключите проверку только для разработки.
-- **Схема:** импортируйте в Insomnia файл [`proto/gophkeeper.proto`](proto/gophkeeper.proto) (или включите server reflection, если добавите его в сервер).
+- **TLS:** если включён `ENABLE_HTTPS`, gRPC использует те же `TLS_CERT_FILE` / `TLS_KEY_FILE` — в клиенте укажите `grpcs://…` и при self-signed настройте доверие к сертификату или отключите проверку только для разработки.
+- **Схема API** можно задать двумя способами:
+  - импортировать [`proto/gophkeeper.proto`](proto/gophkeeper.proto) в клиенте;
+  - использовать **gRPC Server Reflection** (на сервере включено в `cmd/server/main.go`) — тогда локальный `.proto` не обязателен.
 - **Сервис в proto:** `gophkeeper.v1.GophKeeperService`.
+
+### Insomnia и server reflection
+
+1. Запустите сервер и убедитесь, что доступен адрес вида `HOST:GRPC_PORT`.
+2. Создайте запрос типа **gRPC** и в поле URL укажите:
+   - без TLS: `grpc://127.0.0.1:<GRPC_PORT>`;
+   - с TLS: `grpcs://127.0.0.1:<GRPC_PORT>`.
+3. В настройках запроса (Proto / Schema) выберите источник **Server Reflection** (не «Import .proto») и выполните **Sync** / обновление схемы — Insomnia запросит reflection API и подгрузит сервисы и методы.
+4. Выберите в списке `gophkeeper.v1.GophKeeperService` и нужный RPC, заполните тело сообщения.
+5. Для защищённых методов добавьте metadata `authorization` (см. ниже).
+
+Если синхронизация с reflection падает с ошибкой про `grpc.reflection…`, обновите Insomnia до актуальной версии. На публичных окружениях reflection лучше не открывать наружу без ограничения доступа.
 
 ### Авторизация (metadata)
 
@@ -128,3 +142,15 @@ go run ./cmd/server/... -r
 (или `RUN_MIGRATIONS=true` в окружении — см. актуальное поведение в `internal/config`.)
 
 ВНИМАНИЕ: при первом запуске сервере миграции запустятся автоматически если не будет найдена таблица `users`.
+
+## Тестирование
+
+Для запуска текста из корня необходимо вызвать команду:
+```bash
+go test -v ./...
+```
+
+Для того, чтобы узнать процент покрытия тестами используется команда:
+```bash
+go test -cover ./...
+```

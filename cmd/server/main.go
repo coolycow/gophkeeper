@@ -23,6 +23,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -138,6 +139,9 @@ func main() {
 	// Инициализируем gRPC сервер
 	grpcSrv := grpc.NewServer(grpcOpts...)
 	grpcserver.NewServer(auditNotifier, userSvc, secretSvc, secretVersionSvc, attachmentSvc).RegisterGRPC(grpcSrv)
+
+	// Server reflection: grpcurl / Insomnia могут узнавать схему без локального .proto.
+	reflection.Register(grpcSrv)
 
 	// Получаем адрес gRPC сервера и запускаем сервер
 	grpcLis, err := net.Listen("tcp", cfg.GetGRPCServerAddress())
