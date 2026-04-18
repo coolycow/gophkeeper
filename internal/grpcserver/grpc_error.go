@@ -22,7 +22,7 @@ func grpcError(err error) error {
 			return status.Error(codes.InvalidArgument, ce.Message)
 		case http.StatusNotFound: // 404
 			return status.Error(codes.NotFound, ce.Message)
-		case http.StatusConflict: // 409 → AlreadyExists (текст — полный short URL, как в HTTP)
+		case http.StatusConflict: // 409
 			return status.Error(codes.AlreadyExists, ce.Message)
 		case http.StatusUnauthorized: // 401
 			return status.Error(codes.Unauthenticated, ce.Message)

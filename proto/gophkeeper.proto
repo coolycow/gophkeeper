@@ -1,0 +1,264 @@
+// Контракт публичного API GophKeeper по gRPC.
+// Смысл полей совпадает с доменными моделями в internal/model.
+//
+//
+// Генерация Go-кода (выполнять из корня модуля github.com/coolycow/gophkeeper):
+//  1) Установить protoc: https://github.com/protocolbuffers/protobuf/releases (нужен каталог include с google/protobuf/*.proto).
+//  2) Поставить плагины:
+//       go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+//       go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+//  3) Запустить из корня репозитория (well-known типы лежат в proto/google/protobuf/):
+//       protoc -I proto -I . --go_out=. --go_opt=module=github.com/coolycow/gophkeeper --go-grpc_out=. --go-grpc_opt=module=github.com/coolycow/gophkeeper proto/gophkeeper.proto
+//     При необходимости можно вместо -I proto указать -I <каталог include из установки protoc>.
+//     Результат: internal/proto/gophkeeperpb/*.pb.go — их коммитят в репозиторий и не правят вручную.
+syntax = "proto3";
+
+package gophkeeper.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/coolycow/gophkeeper/internal/proto/gophkeeperpb;gophkeeperpb";
+
+// -----------------------------------------------------------------------------
+// Сервис: один вход для CLI и других клиентов.
+// Вызовы, кроме Register, Login, Ping, требуют метаданных авторизации
+// (например заголовок "authorization: Bearer <JWT>") — это настраивается в коде сервера, не в .proto.
+// -----------------------------------------------------------------------------
+
+service GophKeeperService {
+  // Проверка доступности сервера (без авторизации).
+  rpc Ping(PingRequest) returns (PingResponse);
+
+  // Регистрация нового пользователя (без авторизации).
+  rpc Register(RegisterRequest) returns (AuthResponse);
+
+  // Вход по email и паролю (без авторизации).
+  rpc Login(LoginRequest) returns (AuthResponse);
+
+  // Обновление пары access/refresh по refresh-токену (без access-токена в заголовке).
+  rpc RefreshToken(RefreshTokenRequest) returns (AuthResponse);
+
+  // Список секретов пользователя — для обзора и синхронизации (какие есть id и текущая версия).
+  rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse);
+
+  // Получить секрет с текущей версией (и при необходимости историей версий).
+  rpc GetSecret(GetSecretRequest) returns (Secret);
+
+  // Создать новый секрет (первая версия ciphertext задаётся клиентом).
+  rpc CreateSecret(CreateSecretRequest) returns (Secret);
+
+  // Добавить новую версию секрета (данные снова шифрует клиент).
+  rpc UpdateSecret(UpdateSecretRequest) returns (SecretVersion);
+
+  // Удалить секрет (логика «мягкое/жёсткое» — на усмотрение реализации сервера).
+  rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
+
+  // История версий одного секрета (для отката и синхронизации).
+  rpc ListSecretVersions(ListSecretVersionsRequest) returns (ListSecretVersionsResponse);
+
+  // Одна конкретная версия (если нужна без полного GetSecret).
+  rpc GetSecretVersion(GetSecretVersionRequest) returns (SecretVersion);
+
+  // Вложения к версии секрета: список без тела файла.
+  rpc ListAttachments(ListAttachmentsRequest) returns (ListAttachmentsResponse);
+
+  // Скачать одно вложение целиком (метаданные + ciphertext).
+  rpc GetAttachment(GetAttachmentRequest) returns (Attachment);
+
+  // Загрузить вложение к указанной версии секрета.
+  rpc CreateAttachment(CreateAttachmentRequest) returns (Attachment);
+
+  // Удалить вложение.
+  rpc DeleteAttachment(DeleteAttachmentRequest) returns (DeleteAttachmentResponse);
+}
+
+// -----------------------------------------------------------------------------
+// Общие типы
+// -----------------------------------------------------------------------------
+
+// Запрос Ping: пустое сообщение своего типа — при появлении параметров (например locale)
+// добавляются новые поля с номерами, старые клиенты по правилам proto3 их игнорируют.
+message PingRequest {}
+
+// Ответ на Ping: можно расширять (версия сервера и т.д.).
+message PingResponse {
+  // Короткая строка, например "ok".
+  string status = 1;
+}
+
+// Ответ на удаление секрета: пока без полей; при необходимости сюда добавляют, например,
+// идентификатор асинхронной операции или время удаления — номера полей не пересекаются с «чужими» типами.
+message DeleteSecretResponse {}
+
+// Ответ на удаление вложения — отдельный тип для независимого расширения.
+message DeleteAttachmentResponse {}
+
+// Условный «тип» секрета для фильтрации в UI; сами секреты на сервере — непрозрачный blob.
+enum SecretKind {
+  // Значение по умолчанию — если клиент не задаёт тип явно.
+  SECRET_KIND_UNSPECIFIED = 0;
+  SECRET_KIND_LOGIN_PASSWORD = 1;
+  SECRET_KIND_TEXT = 2;
+  SECRET_KIND_BINARY = 3;
+  SECRET_KIND_BANK_CARD = 4;
+}
+
+// -----------------------------------------------------------------------------
+// Аутентификация
+// -----------------------------------------------------------------------------
+
+message RegisterRequest {
+  // Email пользователя (уникален на сервере).
+  string email = 1;
+  string password = 2;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RefreshTokenRequest {
+  // Refresh-токен, выданный ранее при Login/Register/Refresh.
+  string refresh_token = 1;
+}
+
+// Ответ с токенами (как в model.AuthResponse).
+message AuthResponse {
+  string salt = 1;
+  string token = 2;
+  string refresh_token = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+// -----------------------------------------------------------------------------
+// Секреты
+// -----------------------------------------------------------------------------
+
+// Краткая информация о секрете для списков и синхронизации.
+message SecretSummary {
+  string id = 1;
+  string current_secret_version_id = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  SecretKind kind = 4;
+}
+
+message ListSecretsRequest {
+  SecretKind filter_kind = 1;
+}
+
+message ListSecretsResponse {
+  repeated SecretSummary secrets = 1;
+}
+
+message GetSecretRequest {
+  string secret_id = 1;
+  bool include_version_history = 2;
+}
+
+// Полный секрет: метаданные + текущая версия и опционально история.
+message Secret {
+  string id = 1;
+  string user_id = 2;
+  string current_secret_version_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  google.protobuf.Timestamp deleted_at = 6;
+  SecretVersion current_version = 7;
+  repeated SecretVersion secret_versions = 8;
+}
+
+message SecretVersion {
+  string id = 1;
+  string secret_id = 2;
+  int32 version = 3;
+  int32 data_format_version = 4;
+  bytes data_encrypted = 5;
+  int32 data_size = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp deleted_at = 9;
+}
+
+message CreateSecretRequest {
+  bytes data_encrypted = 1;
+  int32 data_format_version = 2;
+  SecretKind kind = 3;
+}
+
+message UpdateSecretRequest {
+  string secret_id = 1;
+  bytes data_encrypted = 2;
+  int32 data_format_version = 3;
+}
+
+message DeleteSecretRequest {
+  string secret_id = 1;
+}
+
+message ListSecretVersionsRequest {
+  string secret_id = 1;
+}
+
+message ListSecretVersionsResponse {
+  repeated SecretVersion versions = 1;
+}
+
+message GetSecretVersionRequest {
+  string secret_id = 1;
+  string secret_version_id = 2;
+}
+
+// -----------------------------------------------------------------------------
+// Вложения (файлы к версии секрета)
+// -----------------------------------------------------------------------------
+
+message AttachmentSummary {
+  string id = 1;
+  string secret_version_id = 2;
+  int32 data_format_version = 3;
+  int32 info_format_version = 4;
+  bytes info_encrypted = 5;
+  int32 info_size = 6;
+  int32 data_size = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message Attachment {
+  string id = 1;
+  string secret_version_id = 2;
+  int32 data_format_version = 3;
+  int32 info_format_version = 4;
+  bytes info_encrypted = 5;
+  int32 info_size = 6;
+  bytes data_encrypted = 7;
+  int32 data_size = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message ListAttachmentsRequest {
+  oneof scope {
+    string secret_id = 1;
+    string secret_version_id = 2;
+  }
+}
+
+message ListAttachmentsResponse {
+  repeated AttachmentSummary attachments = 1;
+}
+
+message GetAttachmentRequest {
+  string attachment_id = 1;
+}
+
+message CreateAttachmentRequest {
+  string secret_version_id = 1;
+  int32 data_format_version = 2;
+  int32 info_format_version = 3;
+  bytes info_encrypted = 4;
+  bytes data_encrypted = 5;
+}
+
+message DeleteAttachmentRequest {
+  string attachment_id = 1;
+}

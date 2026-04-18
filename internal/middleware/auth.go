@@ -42,13 +42,13 @@ func createUserAndCookieValue(ctx context.Context, userService service.UserServi
 		return model.User{}, "", err
 	}
 
-	cookieValue, err := userService.GetCookieValueByUser(user)
+	cookieValue, err := userService.GetCookieValueByUser(*user)
 
 	if err != nil {
 		return model.User{}, "", err
 	}
 
-	return user, cookieValue, nil
+	return *user, cookieValue, nil
 }
 
 // OptionalAuthMiddleware проверяет наличие куки авторизации и создает пользователя если куки нет
@@ -102,7 +102,7 @@ func OptionalAuthMiddleware(userService service.UserService) gin.HandlerFunc {
 				userID = user.ID
 			}
 
-			_, err = userService.GetUser(c.Request.Context(), userID)
+			_, err = userService.GetUserByID(c.Request.Context(), userID)
 			if err != nil {
 				_ = c.Error(httpError.CustomError{
 					Message:    "User with this ID does not exist",
@@ -138,7 +138,7 @@ func RequiredAuthMiddleware(userService service.UserService) gin.HandlerFunc {
 			return
 		}
 
-		_, err = userService.GetUser(c.Request.Context(), userID)
+		_, err = userService.GetUserByID(c.Request.Context(), userID)
 		if err != nil {
 			_ = c.Error(httpError.CustomError{
 				Message:    "User with this ID does not exist",
