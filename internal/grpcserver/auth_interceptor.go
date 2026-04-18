@@ -2,9 +2,13 @@ package grpcserver
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 
+	"github.com/coolycow/gophkeeper/internal/ctxutil"
 	"github.com/coolycow/gophkeeper/internal/logger"
+	"github.com/coolycow/gophkeeper/internal/proto/gophkeeperpb"
 	"github.com/coolycow/gophkeeper/internal/service"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -13,73 +17,70 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// metadataSetAuthorization — нестандартный исходящий заголовок с hex-токеном для следующих вызовов (аналог Set-Cookie).
-const metadataSetAuthorization = "set-authorization"
-
-// AuthUnaryServerInterceptor подставляет userID в контекст по правилам OptionalAuth (HTTP).
+// AuthUnaryServerInterceptor проверяет metadata "authorization" для защищённых методов
+// и кладёт userID в контекст. Публичные методы (см. isPublicGRPCMethod) пропускаются без токена.
 func AuthUnaryServerInterceptor(users service.UserService) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		// Получаем metadata из контекста
-		md, ok := metadata.FromIncomingContext(ctx)
+		if isPublicGRPCMethod(info.FullMethod) {
+			return handler(ctx, req)
+		}
 
-		// Если metadata нет, создаём пустой metadata
+		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			md = metadata.MD{}
 		}
 
-		// Получаем authorization из metadata
 		auth := ""
 		if v := md.Get("authorization"); len(v) > 0 {
-			auth = v[0]
+			auth = strings.TrimSpace(v[0])
 		}
 
-		// Решаем пользователя и токен
-		userID, newToken, err := resolveGRPCUser(ctx, users, auth)
+		userID, err := resolveProtectedUser(ctx, users, auth)
 		if err != nil {
 			return nil, err
 		}
 
-		// Если токен изменился, устанавливаем его в metadata
-		if newToken != "" {
-			if herr := grpc.SetHeader(ctx, metadata.Pairs(metadataSetAuthorization, newToken)); herr != nil {
-				logger.Log.Error("grpc auth: set header", zap.Error(herr))
-				return nil, status.Error(codes.Internal, "internal error")
-			}
-		}
-
-		// Кладём userID в контекст
-		ctx = shortener.ContextWithUserID(ctx, userID)
+		ctx = ctxutil.WithUserID(ctx, userID)
 		return handler(ctx, req)
 	}
 }
 
-// resolveGRPCUser: пустой/невалидный токен → новый пользователь и новый токен; валидный, но user не найден → Unauthenticated.
-func resolveGRPCUser(ctx context.Context, users service.UserService, authHeader string) (userID string, newAuthHex string, err error) {
+// isPublicGRPCMethod: методы, которые не требуют авторизации (выполняются без токена)
+func isPublicGRPCMethod(fullMethod string) bool {
+	switch fullMethod {
+	case gophkeeperpb.GophKeeperService_Ping_FullMethodName,
+		gophkeeperpb.GophKeeperService_Register_FullMethodName,
+		gophkeeperpb.GophKeeperService_Login_FullMethodName,
+		gophkeeperpb.GophKeeperService_RefreshToken_FullMethodName:
+		return true
+	default:
+		return false
+	}
+}
+
+// resolveProtectedUser: для защищённых RPC нужен валидный токен и существующий пользователь.
+func resolveProtectedUser(ctx context.Context, users service.UserService, authHeader string) (userID string, err error) {
 	authHeader = strings.TrimSpace(authHeader)
+	if authHeader == "" {
+		return "", status.Error(codes.Unauthenticated, "missing authorization")
+	}
 
 	userID, decErr := users.GetUserIDFromAuthToken(authHeader)
 	if decErr != nil {
-		// Если токен невалидный, создаём нового пользователя
-		u, cerr := users.CreateUser(ctx)
-		if cerr != nil {
-			logger.Log.Error("grpc auth: create user", zap.Error(cerr))
-			return "", "", status.Error(codes.Internal, "internal error")
-		}
-
-		// Получаем токен для нового пользователя
-		tok, terr := users.GetCookieValueByUser(u)
-		if terr != nil {
-			logger.Log.Error("grpc auth: issue token", zap.Error(terr))
-			return "", "", status.Error(codes.Internal, "internal error")
-		}
-
-		return u.ID, tok, nil
+		return "", status.Error(codes.Unauthenticated, "invalid or expired token")
 	}
 
-	// Если пользователь не найден, возвращаем ошибку Unauthenticated
-	if _, gerr := users.GetUser(ctx, userID); gerr != nil {
-		return "", "", status.Error(codes.Unauthenticated, "user not found")
+	u, gerr := users.GetUserByID(ctx, userID)
+	if gerr != nil {
+		if errors.Is(gerr, sql.ErrNoRows) {
+			return "", status.Error(codes.Unauthenticated, "user not found")
+		}
+		logger.Log.Error("grpc auth: get user", zap.Error(gerr))
+		return "", status.Error(codes.Internal, "internal error")
+	}
+	if u == nil {
+		return "", status.Error(codes.Unauthenticated, "user not found")
 	}
 
-	return userID, "", nil
+	return userID, nil
 }

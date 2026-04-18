@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Server реализует gophkeeperpb.GophKeeperServiceServer, вызывая пакет gophkeeper.
+// Server реализует gophkeeperpb.GophKeeperServiceServer (обработчики RPC добавляются по мере готовности).
 type Server struct {
 	gophkeeperpb.UnimplementedGophKeeperServiceServer
 	auditNotifier    *audit.Notifier
@@ -31,7 +31,8 @@ func NewServer(auditNotifier *audit.Notifier,
 	}
 }
 
-// Register регистрирует сервис на переданном grpc.Server.
-func (s *Server) Register(reg grpc.ServiceRegistrar) {
+// RegisterGRPC регистрирует реализацию GophKeeperService на переданном grpc.Server.
+// Имя метода не Register, чтобы не пересекаться с RPC Register из сгенерированного интерфейса.
+func (s *Server) RegisterGRPC(reg grpc.ServiceRegistrar) {
 	gophkeeperpb.RegisterGophKeeperServiceServer(reg, s)
 }

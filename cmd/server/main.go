@@ -137,7 +137,7 @@ func main() {
 
 	// Инициализируем gRPC сервер
 	grpcSrv := grpc.NewServer(grpcOpts...)
-	grpcserver.NewServer(auditNotifier, userSvc, secretSvc, secretVersionSvc, attachmentSvc).Register(grpcSrv)
+	grpcserver.NewServer(auditNotifier, userSvc, secretSvc, secretVersionSvc, attachmentSvc).RegisterGRPC(grpcSrv)
 
 	// Получаем адрес gRPC сервера и запускаем сервер
 	grpcLis, err := net.Listen("tcp", cfg.GetGRPCServerAddress())
