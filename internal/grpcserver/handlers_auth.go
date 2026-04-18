@@ -84,7 +84,7 @@ func (s *Server) RefreshToken(ctx context.Context, req *gophkeeperpb.RefreshToke
 	}
 
 	// Если пользователь удален (мягкое удаление), возвращаем ошибку.
-	if !u.DeletedAt.IsZero() {
+	if u.DeletedAt != nil && !u.DeletedAt.IsZero() {
 		return nil, status.Error(codes.Unauthenticated, "user deleted")
 	}
 
