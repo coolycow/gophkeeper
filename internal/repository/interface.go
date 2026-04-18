@@ -24,16 +24,16 @@ type GophKeeperRepository interface {
 	GetUsersCount(ctx context.Context) int                                 // возвращает количество пользователей
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С СЕКРЕТАМИ //////////////////////////////////////////////////////////////
-	GetSecretByID(ctx context.Context, secretID string) (*model.Secret, error)                               // получает секрет по его ID
+	GetSecretByID(ctx context.Context, secretID string) (*model.Secret, error)                                   // получает секрет по его ID
 	GetSecretsByUserID(ctx context.Context, userID string, scope model.SecretListScope) ([]*model.Secret, error) // список секретов: активные, корзина (мягко удалённые) или все
-	GetSecretByUserIDAndSecretID(ctx context.Context, userID string, secretID string) (*model.Secret, error) // получает секрет по его ID и ID пользователя
-	CreateSecret(ctx context.Context, userID string, secret *model.Secret) (*model.Secret, error)            // создает секрет
-	UpdateSecret(ctx context.Context, userID string, secretID string, secret *model.Secret) error            // обновляет секрет
-	SoftDeleteSecret(ctx context.Context, userID string, secretID string) error                              // мягко удаляет секрет
-	HardDeleteSecret(ctx context.Context, userID string, secretID string) error                              // полностью удаляет секрет
-	CompressSecretByID(ctx context.Context, userID string, secretID string) error                            // удаляет все версии секрета кроме актуальной
-	CompressSecretsByUserID(ctx context.Context, userID string) error                                        // удаляет все версии секретов кроме актуальной для всех секретов пользователя
-	GetMaxSecretVersion(ctx context.Context, userID string, secretID string) (int, error)                    // получает максимальную версию секрета
+	GetSecretByUserIDAndSecretID(ctx context.Context, userID string, secretID string) (*model.Secret, error)     // получает секрет по его ID и ID пользователя
+	CreateSecret(ctx context.Context, userID string, secret *model.Secret) (*model.Secret, error)                // создает секрет
+	UpdateSecret(ctx context.Context, userID string, secretID string, secret *model.Secret) error                // обновляет секрет
+	SoftDeleteSecret(ctx context.Context, userID string, secretID string) error                                  // мягко удаляет секрет
+	HardDeleteSecret(ctx context.Context, userID string, secretID string) error                                  // полностью удаляет секрет
+	CompressSecretByID(ctx context.Context, userID string, secretID string) error                                // удаляет все версии секрета кроме актуальной
+	CompressSecretsByUserID(ctx context.Context, userID string) error                                            // удаляет все версии секретов кроме актуальной для всех секретов пользователя
+	GetMaxSecretVersion(ctx context.Context, userID string, secretID string) (int, error)                        // получает максимальную версию секрета
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С ИСТОРИЕЙ СЕКРЕТОВ //////////////////////////////////////////////////////////////
 	GetCurrentSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error)                                 // получает текущую версию секрета
@@ -42,6 +42,7 @@ type GophKeeperRepository interface {
 	GetAllSecretHistories(ctx context.Context, userID string, secretID string) ([]*model.SecretVersion, error)                                 // получает все версии секрета
 	CreateSecretVersion(ctx context.Context, userID string, secretID string, secretVersion *model.SecretVersion) (*model.SecretVersion, error) // создает версию секрета
 	HardDeleteSecretVersion(ctx context.Context, userID string, secretID string, secretVersionID string) error                                 // полностью удаляет версию секрета (мягкое удаление невозможно, т.к. не имеет смысла)
+	HardDeleteOldestSecretVersion(ctx context.Context, userID string, secretID string) error                                                   // полностью удаляет самую старую версию секрета (должна быть не актуальной версией)
 	RestoreSecretVersion(ctx context.Context, userID string, secretID string, secretVersionID string) error                                    // восстанавливает версию секрета (делает её текущей для секрета)
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С ВЛОЖЕНИЯМИ //////////////////////////////////////////////////////////////

@@ -676,29 +676,8 @@ func (r *PostgresRepository) CreateSecretVersion(ctx context.Context, userID str
 
 // HardDeleteSecretVersion полностью удаляет версию секрета (мягкое удаление невозможно, т.к. не имеет смысла)
 func (r *PostgresRepository) HardDeleteSecretVersion(ctx context.Context, userID string, secretID string, secretVersionID string) error {
-	// Проверяем, что версия секрета является текущей
-	row := r.db.QueryRowContext(ctx, "select current_secret_version_id from secrets where user_id = $1 and id = $2", userID, secretID)
-
-	var currentVersionID sql.NullString
-	err := row.Scan(&currentVersionID)
-
-	// Ошибка получения ID текущей версии секрета
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrSecretNotFound
-		}
-		logger.Log.Error("Error getting current secret version id", zap.Error(err))
-		return err
-	}
-
-	// Если версия секрета является текущей, то нельзя удалить
-	if currentVersionID.Valid && currentVersionID.String == secretVersionID {
-		logger.Log.Error("cannot delete current secret version")
-		return ErrCannotDeleteCurrentSecretVersion
-	}
-
 	// Удаляем версию секрета
-	result, err := r.db.ExecContext(ctx, `
+	_, err := r.db.ExecContext(ctx, `
 		delete from secret_versions sv
 		using secrets s
 		where sv.secret_id = s.id
@@ -714,15 +693,48 @@ func (r *PostgresRepository) HardDeleteSecretVersion(ctx context.Context, userID
 		return err
 	}
 
-	// Получаем количество удаленных версий секрета
-	n, err := result.RowsAffected()
+	return nil
+}
+
+// HardDeleteOldestSecretVersion полностью удаляет самую старую версию секрета (должна быть не актуальной версией)
+// Логика: удаляем ближайшую к текущей не актуальную версию (проверка по минимуму версии исключая текущую).
+// Если у секрета всего одна версия, то удаляем её и по сути секрет становится пустым.
+func (r *PostgresRepository) HardDeleteOldestSecretVersion(ctx context.Context, userID string, secretID string) error {
+	// Получаем количество версий секрета
+	row := r.db.QueryRowContext(ctx, "select count(*) from secret_versions where secret_id = $1 and secret_id in (select id from secrets where user_id = $2)", secretID, userID)
+
+	var count int
+	err := row.Scan(&count)
+
 	if err != nil {
+		logger.Log.Error("Error getting count of secret versions", zap.Error(err))
 		return err
 	}
 
-	// Если количество удаленных версий секрета равно 0, то возвращаем ошибку
-	if n == 0 {
-		return ErrSecretVersionNotFound
+	// Если количество версий секрета равно 1, то удаляем её и по сути секрет становится пустым
+	if count == 1 {
+		_, err := r.db.ExecContext(ctx, "delete from secret_versions where secret_id = $1 and secret_id in (select id from secrets where user_id = $2)", secretID, userID)
+
+		if err != nil {
+			logger.Log.Error("Error deleting oldest secret version", zap.Error(err))
+			return err
+		}
+
+		return nil
+	}
+
+	// Удаляем версию секрета с минимальной версией (проверка по минимуму версии исключая текущую)
+	_, err = r.db.ExecContext(ctx, `delete from secret_versions 
+	where secret_id = $1 
+	and secret_id in (select id from secrets where user_id = $2) 
+	and version = (
+		select min(version) from secret_versions where secret_id = $1
+		and secret_id in (select id from secrets where user_id = $2)
+		and version <> (select current_secret_version_id from secrets where user_id = $2 and id = $3))`, secretID, userID, secretID)
+
+	if err != nil {
+		logger.Log.Error("Error deleting oldest secret version", zap.Error(err))
+		return err
 	}
 
 	return nil

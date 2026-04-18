@@ -72,6 +72,23 @@ func (s *secretVersionService) CreateSecretVersion(ctx context.Context, userID s
 		}
 	}
 
+	// Проверяем общее количество версий секрета
+	secretVersions, err := s.repo.GetAllSecretHistories(ctx, userID, secretID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Если количество версий секрета равно максимальному количеству версий, то удаляем самую старую версию.
+	// Особый случай: если у секрета всего одна версия, то удаляем её и по сути секрет становится пустым.
+	// Если s.cfg.SecretVersionCount == 0, то не ограничиваем количество версий.
+	if s.cfg.SecretVersionCount > 0 && len(secretVersions) >= s.cfg.SecretVersionCount {
+		err = s.repo.HardDeleteOldestSecretVersion(ctx, userID, secretID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Вычисляем размер данных
 	secretVersion.DataSize = len(secretVersion.DataEncrypted)
 
