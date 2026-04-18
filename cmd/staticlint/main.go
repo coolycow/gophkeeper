@@ -12,7 +12,7 @@
 package main
 
 import (
-	"github.com/coolycow/shortener/cmd/staticlint/exitcheck"
+	"github.com/coolycow/gophkeeper/cmd/staticlint/exitcheck"
 	"github.com/kisielk/errcheck/errcheck"
 	"github.com/timakin/bodyclose/passes/bodyclose"
 	"golang.org/x/tools/go/analysis"

@@ -6,7 +6,6 @@ import (
 
 	"github.com/coolycow/gophkeeper/internal/logger"
 	"github.com/coolycow/gophkeeper/internal/service"
-	"github.com/coolycow/shortener/internal/shortener"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
