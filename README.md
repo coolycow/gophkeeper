@@ -1,117 +1,130 @@
-# go-musthave-shortener-tpl
+# GophKeeper
 
-Шаблон репозитория для трека «Сервис сокращения URL».
+Клиент-серверное приложение для безопасного хранения приватных данных (логины и пароли, текст, бинарные данные, данные банковских карт и др.). Полезная нагрузка на сервере хранится в зашифрованном виде; формат шифрования и метаданные задаёт клиент.
 
-## Начало работы
+Сервер поднимает **HTTP**-интерфейс (например, служебные маршруты и статистику) и **gRPC** API (`GophKeeperService`) на отдельном порту. Конфигурация задаётся флагами, переменными окружения и JSON-файлом.
 
-1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере.
-2. В корне репозитория выполните команду `go mod init <name>` (где `<name>` — адрес вашего репозитория на GitHub без префикса `https://`) для создания модуля.
+---
 
-## Обновление шаблона
+## Настройка сервера
 
-Чтобы иметь возможность получать обновления автотестов и других частей шаблона, выполните команду:
+### Приоритет значений
 
+Итоговая конфигурация собирается в таком порядке (последние источники **перекрывают** предыдущие):
+
+1. **Значения по умолчанию** в коде.
+2. **JSON-файл** — путь задаётся флагом `-c` / `--config` или переменной `CONFIG`. Если путь не указан явно и файла по умолчанию нет, шаг пропускается.
+3. **Переменные окружения** (см. таблицу ниже).
+4. **Флаги командной строки** — имеют наивысший приоритет; учитываются только **переданные** флаги (`Changed`).
+
+Пример шаблона JSON: [`config_server.json.example`](config_server.json.example). Скопируйте его в `config_server.json` и подставьте свой DSN и секреты.
+
+### Переменные окружения
+
+| Переменная | Назначение |
+|------------|------------|
+| `CONFIG` | Путь к JSON-конфигу (если не переопределён флагом `-c`). |
+| `HOST` | Адрес прослушивания (HTTP и gRPC). |
+| `PORT` | Порт HTTP. |
+| `GRPC_PORT` | Порт gRPC (не должен совпадать с `PORT`). |
+| `LOG_LEVEL` | Уровень логов. |
+| `DATABASE_DSN` | Строка подключения к PostgreSQL. |
+| `RUN_MIGRATIONS` | Запуск миграций при старте (`true`/`false`). |
+| `ENABLE_HTTPS` | TLS для HTTP (`true`/`false`). |
+| `TLS_CERT_FILE`, `TLS_KEY_FILE` | PEM сертификат и ключ для HTTP/gRPC TLS. |
+| `TRUSTED_SUBNET` | CIDR для доступа к внутренней статистике (если используется). |
+| `SECRET_KEY` | Секрет для токенов/шифрования на сервере (**ровно 32 символа**). |
+| `SECRET_VERSION_COUNT` | Лимит версий секрета (0 — без лимита в допустимых границах). |
+| `SALT_LENGTH` | Длина соли (параметры пользователя/пароля). |
+| `MIN_PASSWORD_LENGTH`, `MAX_PASSWORD_LENGTH` | Ограничения длины пароля. |
+| `AUDIT_FILE`, `AUDIT_URL` | Файл и URL для аудита. |
+
+### Основные флаги
+
+| Флаг | Кратко | Описание |
+|------|--------|----------|
+| `-h`, `--host` | хост | По умолчанию `127.0.0.1`. |
+| `-p`, `--port` | порт HTTP | По умолчанию `8080`. |
+| `-g`, `--grpc-port` | порт gRPC | `0` — выбрать свободный начиная с `PORT+1`. |
+| `-l`, `--log-level` | уровень логов | Например `info`. |
+| `-d`, `--database-dsn` | DSN БД | |
+| `-r`, `--run-migrations` | миграции | |
+| `-s`, `--enable-https` | HTTPS | |
+| `-t`, `--tls-cert-file` | сертификат TLS | |
+| `-k`, `--tls-key-file` | ключ TLS | |
+| `-c`, `--config` | JSON-конфиг | По умолчанию имя `config_server.json`. |
+| `--trusted-subnet` | доверенная подсеть | CIDR. |
+| `-x`, `--secret-key` | секретный ключ | 32 символа. |
+| `-v`, `--secret-version-count` | лимит версий | |
+| `-m`, `--salt-length` | длина соли | |
+| `-o`, `--min-password-length` | мин. длина пароля | |
+| `--max-password-length` | макс. длина пароля | |
+| `-a`, `--audit-file` | файл аудита | |
+| `-b`, `--audit-url` | URL аудита | |
+
+Путь к JSON и сами поля в файле используют **snake_case** (`host`, `database_dsn`, `grpc_port`, …). Ключ `config` внутри JSON для загрузки не используется — путь к файлу задаётся только `-c` / `CONFIG`.
+
+---
+
+## gRPC API (для Insomnia и других клиентов)
+
+### Подключение
+
+- **Адрес:** `HOST:GRPC_PORT` (тот же хост, что и у HTTP; порт из конфигурации).
+- **TLS:** если включён `ENABLE_HTTPS`, gRPC использует те же `TLS_CERT_FILE` / `TLS_KEY_FILE` — в Insomnia включите TLS и при self-signed укажите доверие к сертификату или отключите проверку только для разработки.
+- **Схема:** импортируйте в Insomnia файл [`proto/gophkeeper.proto`](proto/gophkeeper.proto) (или включите server reflection, если добавите его в сервер).
+- **Сервис в proto:** `gophkeeper.v1.GophKeeperService`.
+
+### Авторизация (metadata)
+
+Для всех методов, **кроме** перечисленных в блоке «без токена», нужен заголовок metadata:
+
+| Ключ | Значение |
+|------|----------|
+| `authorization` | Токен доступа в том виде, как его выдаёт сервер после `Register` / `Login` / `RefreshToken` (строка в hex). Допустим префикс `Bearer ` перед токеном. |
+
+В Insomnia: для запроса gRPC откройте раздел **Metadata** / **Headers** (в зависимости от версии) и добавьте пару `authorization` = ваш токен.
+
+### Методы
+
+Полный путь вызова в стиле gRPC (как в логах и в коде):
+
+| Метод (RPC) | Полный путь | Нужен `authorization` | Кратко |
+|-------------|-------------|-------------------------|--------|
+| `Ping` | `/gophkeeper.v1.GophKeeperService/Ping` | Нет | Проверка живости; тело: `PingRequest` (пустое сообщение). |
+| `Register` | `…/Register` | Нет | Регистрация; тело: `email`, `password`. |
+| `Login` | `…/Login` | Нет | Вход; тело: `email`, `password`. |
+| `RefreshToken` | `…/RefreshToken` | Нет | Обновление сессии; тело: `refresh_token`. |
+| `ListSecrets` | `…/ListSecrets` | Да | Список секретов; тело: опционально `filter_kind` (`SecretKind`). |
+| `GetSecret` | `…/GetSecret` | Да | Один секрет; тело: `secret_id`, `include_version_history`. |
+| `CreateSecret` | `…/CreateSecret` | Да | Новый секрет; тело: `data_encrypted`, `data_format_version`, `kind`. |
+| `UpdateSecret` | `…/UpdateSecret` | Да | Новая версия; тело: `secret_id`, `data_encrypted`, `data_format_version`. |
+| `DeleteSecret` | `…/DeleteSecret` | Да | Удаление; тело: `secret_id`. |
+| `ListSecretVersions` | `…/ListSecretVersions` | Да | История версий; тело: `secret_id`. |
+| `GetSecretVersion` | `…/GetSecretVersion` | Да | Одна версия; тело: `secret_id`, `secret_version_id`. |
+| `ListAttachments` | `…/ListAttachments` | Да | Список вложений; тело: **один из** `secret_id` **или** `secret_version_id` (`oneof`). |
+| `GetAttachment` | `…/GetAttachment` | Да | Скачать вложение; тело: `attachment_id`. |
+| `CreateAttachment` | `…/CreateAttachment` | Да | Загрузить вложение; тело: `secret_version_id`, форматы, `info_encrypted`, `data_encrypted`. |
+| `DeleteAttachment` | `…/DeleteAttachment` | Да | Удалить вложение; тело: `attachment_id`. |
+
+Типы полей и перечисление `SecretKind` описаны в [`proto/gophkeeper.proto`](proto/gophkeeper.proto).
+
+---
+
+## Запуск сервера
+
+Из корня репозитория (после настройки `DATABASE_DSN` и при необходимости `config_server.json`):
+
+```bash
+go run ./cmd/server/...
 ```
-git remote add -m v2 template https://github.com/Yandex-Practicum/go-musthave-shortener-tpl.git
+
+С миграциями один раз:
+
+```bash
+go run ./cmd/server/... -r
 ```
 
-Для обновления кода автотестов выполните команду:
+(или `RUN_MIGRATIONS=true` в окружении — см. актуальное поведение в `internal/config`.)
 
-```
-git fetch template && git checkout template/v2 .github
-```
-
-Затем добавьте полученные изменения в свой репозиторий.
-
-## Запуск автотестов
-
-Для успешного запуска автотестов называйте ветки `iter<number>`, где `<number>` — порядковый номер инкремента. Например, в ветке с названием `iter4` запустятся автотесты для инкрементов с первого по четвёртый.
-
-При мёрже ветки с инкрементом в основную ветку `main` будут запускаться все автотесты.
-
-Подробнее про локальный и автоматический запуск читайте в [README автотестов](https://github.com/Yandex-Practicum/go-autotests).
-
-## Структура проекта
-
-Приведённая в этом репозитории структура проекта является рекомендуемой, но не обязательной.
-
-Это лишь пример организации кода, который поможет вам в реализации сервиса.
-
-При необходимости можно вносить изменения в структуру проекта, использовать любые библиотеки и предпочитаемые структурные паттерны организации кода приложения, например:
-- **DDD** (Domain-Driven Design)
-- **Clean Architecture**
-- **Hexagonal Architecture**
-- **Layered Architecture**
-
-## Профилирование (pprof)
-### Что бы сделано
-В репозитории `double_maps` вместо использования `var result []model.ShortURL` теперь используется единовременная аллокация `make([]model.ShortURL, 0, size)`.
-
-В сервисе `url_service`:
-* Вместо `s.cfg.BaseURL + "/" + resultKey` используется функция `buildFullURL`, которая позволяет избежать лишних аллокаций при конкатенации строк;
-* Вместо `var newURLs []model.ShortURL` как и в репозитории используется единовременная аллокация `newURLs := make([]model.ShortURL, 0, len(URLs))`;
-* Дополнительно переделан поиск уже существуюших ключей. Добавлена мапа urlIndexByOriginal, которую можно собрать один раз (затраты) и потом быстро находить то что нужно по ключу (выгода).
-
-### Нагрузка
-```shell
-for ($i = 0; $i -lt 80000; $i++) {
-  Invoke-WebRequest -Method Post -Uri "http://127.0.0.1:8080/" -Body "https://example.com/path/$i" -ContentType "text/plain" -UseBasicParsing | Out-Null
-  if ($i % 1000 -eq 0) { Write-Host "Sent $i requests" }
-}
-```
-
-### Снятие профиля в момент нагрузки
-```shell
-curl "http://127.0.0.1:8080/debug/pprof/allocs?seconds=30" -o profiles/base_allocs.pprof // ДО ОПТИМИЗАЦИИ
-curl "http://127.0.0.1:8080/debug/pprof/allocs?seconds=30" -o profiles/base_allocs.pprof // ПОСЛЕ ОПТИМИЗАЦИИ
-
-```
-
-### Результат
-```log
-PS I:\practicum\shortener> go tool pprof -top -diff_base=.\profiles\base_allocs.pprof .\profiles\result_allocs.pprof 
-File: shortener.exe
-Build ID: C:\Users\user\go\tmp\go-build4262431577\b001\exe\shortener.exe2026-02-24 18:06:26.3996441 +0300 MSK        
-Type: inuse_space
-Time: 2026-02-24 18:07:03 MSK
-Duration: 60.01s, Total samples = 6039.17kB
-Showing nodes accounting for 3942.63kB, 65.28% of 6039.17kB total
-      flat  flat%   sum%        cum   cum%
- 1805.17kB 29.89% 29.89%  2349.84kB 38.91%  compress/flate.NewWriter (inline)
- 1596.78kB 26.44% 56.33%  1596.78kB 26.44%  github.com/coolycow/shortener/internal/repository.(*DoubleMapsRepository).SaveURL
-  544.67kB  9.02% 65.35%   544.67kB  9.02%  compress/flate.(*compressor).initDeflate (inline)
- -516.01kB  8.54% 56.81%  -516.01kB  8.54%  io.init.func1
-  512.02kB  8.48% 65.28%   512.02kB  8.48%  strings.(*Builder).grow
-         0     0% 65.28%  -516.01kB  8.54%  bufio.(*Writer).Flush
-         0     0% 65.28%   544.67kB  9.02%  compress/flate.(*compressor).init
-         0     0% 65.28%  2349.84kB 38.91%  compress/gzip.(*Writer).Write
-         0     0% 65.28%  4458.64kB 73.83%  github.com/coolycow/shortener/internal/router.NewRouter.ErrorHandler.func3
-         0     0% 65.28%  4458.64kB 73.83%  github.com/coolycow/shortener/internal/router.NewRouter.Gzip.func1       
-         0     0% 65.28%  4458.64kB 73.83%  github.com/coolycow/shortener/internal/router.NewRouter.RequestGzip.func4         0     0% 65.28%  4458.64kB 73.83%  github.com/coolycow/shortener/internal/router.NewRouter.RequestLogger.func2
-         0     0% 65.28%  4458.64kB 73.83%  github.com/coolycow/shortener/internal/router.setupURLRoutes.OptionalAuthMiddleware.func2
-         0     0% 65.28%  4458.64kB 73.83%  github.com/coolycow/shortener/internal/router.setupURLRoutes.PostHandler.func3
-         0     0% 65.28%  1596.78kB 26.44%  github.com/coolycow/shortener/internal/service.(*urlService).CreateShortURL
-         0     0% 65.28%  2349.84kB 38.91%  github.com/gin-gonic/contrib/gzip.(*gzipWriter).Write
-         0     0% 65.28%  4458.64kB 73.83%  github.com/gin-gonic/gin.(*Context).Next
-         0     0% 65.28%  2349.84kB 38.91%  github.com/gin-gonic/gin.(*Context).Render
-         0     0% 65.28%  2349.84kB 38.91%  github.com/gin-gonic/gin.(*Context).String
-         0     0% 65.28%  4458.64kB 73.83%  github.com/gin-gonic/gin.(*Engine).ServeHTTP
-         0     0% 65.28%  4458.64kB 73.83%  github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
-         0     0% 65.28%  4458.64kB 73.83%  github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
-         0     0% 65.28%  4458.64kB 73.83%  github.com/gin-gonic/gin.LoggerWithConfig.func1
-         0     0% 65.28%  2349.84kB 38.91%  github.com/gin-gonic/gin/render.String.Render
-         0     0% 65.28%  2349.84kB 38.91%  github.com/gin-gonic/gin/render.WriteString
-         0     0% 65.28%  -516.01kB  8.54%  io.Copy (inline)
-         0     0% 65.28%  -516.01kB  8.54%  io.CopyN
-         0     0% 65.28%  -516.01kB  8.54%  io.copyBuffer
-         0     0% 65.28%  -516.01kB  8.54%  io.discard.ReadFrom
-         0     0% 65.28%  -516.01kB  8.54%  net/http.(*chunkWriter).Write
-         0     0% 65.28%  -516.01kB  8.54%  net/http.(*chunkWriter).writeHeader
-         0     0% 65.28%  3942.63kB 65.28%  net/http.(*conn).serve
-         0     0% 65.28%  -516.01kB  8.54%  net/http.(*response).finishRequest
-         0     0% 65.28%  4458.64kB 73.83%  net/http.serverHandler.ServeHTTP
-         0     0% 65.28%   512.02kB  8.48%  net/url.(*URL).String
-         0     0% 65.28%   512.02kB  8.48%  strings.(*Builder).Grow
-         0     0% 65.28%  -516.01kB  8.54%  sync.(*Pool).Get
-PS I:\practicum\shortener> 
-```
+ВНИМАНИЕ: при первом запуске сервере миграции запустятся автоматически если не будет найдена таблица `users`.
