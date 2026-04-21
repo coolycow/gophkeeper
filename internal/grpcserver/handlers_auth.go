@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/coolycow/gophkeeper/internal/model"
+	"github.com/coolycow/gophkeeper/internal/observer/audit"
 	"github.com/coolycow/gophkeeper/internal/proto/gophkeeperpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,7 +37,12 @@ func (s *Server) Register(ctx context.Context, req *gophkeeperpb.RegisterRequest
 	}
 
 	// Если пользователь успешно создан, возвращаем токены доступа.
-	return s.newAuthResponse(user)
+	resp, err := s.newAuthResponse(user)
+	if err != nil {
+		return nil, err
+	}
+	s.emitAudit(audit.ActionRegister, user.ID, "", "", "")
+	return resp, nil
 }
 
 // Login выполняет вход по email и паролю.
@@ -50,7 +56,16 @@ func (s *Server) Login(ctx context.Context, req *gophkeeperpb.LoginRequest) (*go
 	}
 
 	// Если пользователь успешно найден, возвращаем токены доступа.
-	return s.newAuthResponse(user)
+	resp, err := s.newAuthResponse(user)
+	if err != nil {
+		return nil, err
+	}
+
+	// Отправляем событие аудита
+	s.emitAudit(audit.ActionLogin, user.ID, "", "", "")
+
+	// Возвращаем токены доступа
+	return resp, nil
 }
 
 // RefreshToken выдаёт новую пару токенов по ранее выданному refresh-токену (тот же формат hex, что и access).
@@ -88,7 +103,17 @@ func (s *Server) RefreshToken(ctx context.Context, req *gophkeeperpb.RefreshToke
 		return nil, status.Error(codes.Unauthenticated, "user deleted")
 	}
 
-	return s.newAuthResponse(u)
+	// Если пользователь успешно найден, возвращаем токены доступа.
+	resp, err := s.newAuthResponse(u)
+	if err != nil {
+		return nil, err
+	}
+
+	// Отправляем событие аудита
+	s.emitAudit(audit.ActionRefreshToken, u.ID, "", "", "")
+
+	// Возвращаем токены доступа
+	return resp, nil
 }
 
 // newAuthResponse создаёт AuthResponse с токенами и сроком действия токенов.

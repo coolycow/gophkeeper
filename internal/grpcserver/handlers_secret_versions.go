@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"context"
 
+	"github.com/coolycow/gophkeeper/internal/observer/audit"
 	"github.com/coolycow/gophkeeper/internal/proto/gophkeeperpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -80,6 +81,9 @@ func (s *Server) DeleteSecretVersion(ctx context.Context, req *gophkeeperpb.Dele
 		return nil, grpcError(err)
 	}
 
+	// Отправляем событие аудита
+	s.emitAudit(audit.ActionDeleteSecretVersion, userID, req.GetSecretId(), req.GetSecretVersionId(), "")
+
 	// Возвращаем идентификатор удаленной версии секрета
 	return &gophkeeperpb.DeleteSecretVersionResponse{SecretVersionId: req.GetSecretVersionId()}, nil
 }
@@ -101,6 +105,9 @@ func (s *Server) RestoreSecretVersion(ctx context.Context, req *gophkeeperpb.Res
 	if err := s.secretVersionSvc.RestoreSecretVersion(ctx, userID, req.GetSecretId(), req.GetSecretVersionId()); err != nil {
 		return nil, grpcError(err)
 	}
+
+	// Отправляем событие аудита
+	s.emitAudit(audit.ActionUpdateSecretVersion, userID, req.GetSecretId(), req.GetSecretVersionId(), "")
 
 	// Возвращаем идентификатор восстановленной версии секрета
 	return &gophkeeperpb.RestoreSecretVersionResponse{SecretVersionId: req.GetSecretVersionId()}, nil

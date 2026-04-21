@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/coolycow/gophkeeper/internal/model"
+	"github.com/coolycow/gophkeeper/internal/observer/audit"
 	"github.com/coolycow/gophkeeper/internal/proto/gophkeeperpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -124,6 +125,9 @@ func (s *Server) CreateSecret(ctx context.Context, req *gophkeeperpb.CreateSecre
 		return nil, status.Error(codes.Internal, "secret created without version")
 	}
 
+	// Отправляем событие аудита
+	s.emitAudit(audit.ActionCreateSecret, userID, sec.ID, sec.CurrentSecretVersionID, "")
+
 	// Преобразуем секрет в proto
 	return protoSecret(sec, sec.SecretVersions[0], nil, false), nil
 }
@@ -158,6 +162,11 @@ func (s *Server) UpdateSecret(ctx context.Context, req *gophkeeperpb.UpdateSecre
 		return nil, grpcError(err)
 	}
 
+	// Отправляем событие аудита
+	s.emitAudit(audit.ActionCreateSecretVersion, userID, req.GetSecretId(), sv.ID, "")
+
+	// Преобразуем версию секрета в proto
+
 	// Преобразуем версию секрета в proto
 	return protoSecretVersion(sv), nil
 }
@@ -179,6 +188,9 @@ func (s *Server) DeleteSecret(ctx context.Context, req *gophkeeperpb.DeleteSecre
 	if err := s.secretSvc.SoftDeleteSecret(ctx, userID, req.GetSecretId()); err != nil {
 		return nil, grpcError(err)
 	}
+
+	// Отправляем событие аудита
+	s.emitAudit(audit.ActionDeleteSecret, userID, req.GetSecretId(), "", "")
 
 	// Возвращаем пустой ответ
 	return &gophkeeperpb.DeleteSecretResponse{}, nil

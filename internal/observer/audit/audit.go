@@ -12,6 +12,10 @@ import (
 
 // Константы типа действия в событии аудита.
 const (
+	ActionRegister     = "register"      // регистрация пользователя
+	ActionLogin        = "login"         // вход по email/паролю
+	ActionRefreshToken = "refresh_token" // обновление пары токенов по refresh
+
 	ActionCreateSecret = "create_secret" // создание секрета
 	ActionUpdateSecret = "update_secret" // обновление секрета
 	ActionDeleteSecret = "delete_secret" // удаление секрета
@@ -70,12 +74,15 @@ func (n *Notifier) RemoveReceiver(r Receiver) {
 	}
 }
 
-// NewEvent создаёт событие аудита с текущим временем (action: ActionShorten или ActionFollow).
-func NewEvent(action, userID, originalURL string) *model.Audit {
+// NewEvent создаёт событие аудита с текущим временем. Неиспользуемые идентификаторы ресурсов передавайте пустыми строками.
+func NewEvent(action, userID, secretID, secretVersionID, attachmentID string) *model.Audit {
 	return &model.Audit{
-		TS:     int(time.Now().Unix()),
-		Action: action,
-		UserID: userID,
+		TS:              int(time.Now().Unix()),
+		Action:          action,
+		UserID:          userID,
+		SecretID:        secretID,
+		SecretVersionID: secretVersionID,
+		AttachmentID:    attachmentID,
 	}
 }
 
