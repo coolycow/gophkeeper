@@ -154,3 +154,22 @@ go test -v ./...
 ```bash
 go test -cover ./...
 ```
+
+## Генерация для Proto
+Генерация Go-кода (выполнять из корня модуля github.com/coolycow/gophkeeper):
+1. Установить protoc: `https://github.com/protocolbuffers/protobuf/releases` (нужен каталог `include` с `google/protobuf/*.proto`).
+
+2. Поставить плагины:
+```bash
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+```
+
+3. Запустить из корня репозитория (well-known типы лежат в `proto/google/protobuf/`):
+```bash
+protoc -I proto -I . --go_out=. --go_opt=module=github.com/coolycow/gophkeeper --go-grpc_out=. --go-grpc_opt=module=github.com/coolycow/gophkeeper proto/gophkeeper.proto
+```
+
+При необходимости можно вместо `-I proto` указать `-I <каталог include из установки protoc>`.
+
+Результат: `internal/proto/gophkeeperpb/*.pb.go` — их коммитят в репозиторий и не правят вручную.

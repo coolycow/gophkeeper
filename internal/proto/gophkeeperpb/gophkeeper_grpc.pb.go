@@ -33,21 +33,23 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GophKeeperService_Ping_FullMethodName               = "/gophkeeper.v1.GophKeeperService/Ping"
-	GophKeeperService_Register_FullMethodName           = "/gophkeeper.v1.GophKeeperService/Register"
-	GophKeeperService_Login_FullMethodName              = "/gophkeeper.v1.GophKeeperService/Login"
-	GophKeeperService_RefreshToken_FullMethodName       = "/gophkeeper.v1.GophKeeperService/RefreshToken"
-	GophKeeperService_ListSecrets_FullMethodName        = "/gophkeeper.v1.GophKeeperService/ListSecrets"
-	GophKeeperService_GetSecret_FullMethodName          = "/gophkeeper.v1.GophKeeperService/GetSecret"
-	GophKeeperService_CreateSecret_FullMethodName       = "/gophkeeper.v1.GophKeeperService/CreateSecret"
-	GophKeeperService_UpdateSecret_FullMethodName       = "/gophkeeper.v1.GophKeeperService/UpdateSecret"
-	GophKeeperService_DeleteSecret_FullMethodName       = "/gophkeeper.v1.GophKeeperService/DeleteSecret"
-	GophKeeperService_ListSecretVersions_FullMethodName = "/gophkeeper.v1.GophKeeperService/ListSecretVersions"
-	GophKeeperService_GetSecretVersion_FullMethodName   = "/gophkeeper.v1.GophKeeperService/GetSecretVersion"
-	GophKeeperService_ListAttachments_FullMethodName    = "/gophkeeper.v1.GophKeeperService/ListAttachments"
-	GophKeeperService_GetAttachment_FullMethodName      = "/gophkeeper.v1.GophKeeperService/GetAttachment"
-	GophKeeperService_CreateAttachment_FullMethodName   = "/gophkeeper.v1.GophKeeperService/CreateAttachment"
-	GophKeeperService_DeleteAttachment_FullMethodName   = "/gophkeeper.v1.GophKeeperService/DeleteAttachment"
+	GophKeeperService_Ping_FullMethodName                 = "/gophkeeper.v1.GophKeeperService/Ping"
+	GophKeeperService_Register_FullMethodName             = "/gophkeeper.v1.GophKeeperService/Register"
+	GophKeeperService_Login_FullMethodName                = "/gophkeeper.v1.GophKeeperService/Login"
+	GophKeeperService_RefreshToken_FullMethodName         = "/gophkeeper.v1.GophKeeperService/RefreshToken"
+	GophKeeperService_ListSecrets_FullMethodName          = "/gophkeeper.v1.GophKeeperService/ListSecrets"
+	GophKeeperService_GetSecret_FullMethodName            = "/gophkeeper.v1.GophKeeperService/GetSecret"
+	GophKeeperService_CreateSecret_FullMethodName         = "/gophkeeper.v1.GophKeeperService/CreateSecret"
+	GophKeeperService_UpdateSecret_FullMethodName         = "/gophkeeper.v1.GophKeeperService/UpdateSecret"
+	GophKeeperService_DeleteSecret_FullMethodName         = "/gophkeeper.v1.GophKeeperService/DeleteSecret"
+	GophKeeperService_ListSecretVersions_FullMethodName   = "/gophkeeper.v1.GophKeeperService/ListSecretVersions"
+	GophKeeperService_GetSecretVersion_FullMethodName     = "/gophkeeper.v1.GophKeeperService/GetSecretVersion"
+	GophKeeperService_DeleteSecretVersion_FullMethodName  = "/gophkeeper.v1.GophKeeperService/DeleteSecretVersion"
+	GophKeeperService_RestoreSecretVersion_FullMethodName = "/gophkeeper.v1.GophKeeperService/RestoreSecretVersion"
+	GophKeeperService_ListAttachments_FullMethodName      = "/gophkeeper.v1.GophKeeperService/ListAttachments"
+	GophKeeperService_GetAttachment_FullMethodName        = "/gophkeeper.v1.GophKeeperService/GetAttachment"
+	GophKeeperService_CreateAttachment_FullMethodName     = "/gophkeeper.v1.GophKeeperService/CreateAttachment"
+	GophKeeperService_DeleteAttachment_FullMethodName     = "/gophkeeper.v1.GophKeeperService/DeleteAttachment"
 )
 
 // GophKeeperServiceClient is the client API for GophKeeperService service.
@@ -76,6 +78,10 @@ type GophKeeperServiceClient interface {
 	ListSecretVersions(ctx context.Context, in *ListSecretVersionsRequest, opts ...grpc.CallOption) (*ListSecretVersionsResponse, error)
 	// Одна конкретная версия (если нужна без полного GetSecret).
 	GetSecretVersion(ctx context.Context, in *GetSecretVersionRequest, opts ...grpc.CallOption) (*SecretVersion, error)
+	// Удалить версию секрета (только жёсткое удаление).
+	DeleteSecretVersion(ctx context.Context, in *DeleteSecretVersionRequest, opts ...grpc.CallOption) (*DeleteSecretVersionResponse, error)
+	// Восстановить версию секрета (устанавливает её текущей для секрета).
+	RestoreSecretVersion(ctx context.Context, in *RestoreSecretVersionRequest, opts ...grpc.CallOption) (*RestoreSecretVersionResponse, error)
 	// Вложения к версии секрета: список без тела файла.
 	ListAttachments(ctx context.Context, in *ListAttachmentsRequest, opts ...grpc.CallOption) (*ListAttachmentsResponse, error)
 	// Скачать одно вложение целиком (метаданные + ciphertext).
@@ -204,6 +210,26 @@ func (c *gophKeeperServiceClient) GetSecretVersion(ctx context.Context, in *GetS
 	return out, nil
 }
 
+func (c *gophKeeperServiceClient) DeleteSecretVersion(ctx context.Context, in *DeleteSecretVersionRequest, opts ...grpc.CallOption) (*DeleteSecretVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteSecretVersionResponse)
+	err := c.cc.Invoke(ctx, GophKeeperService_DeleteSecretVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gophKeeperServiceClient) RestoreSecretVersion(ctx context.Context, in *RestoreSecretVersionRequest, opts ...grpc.CallOption) (*RestoreSecretVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RestoreSecretVersionResponse)
+	err := c.cc.Invoke(ctx, GophKeeperService_RestoreSecretVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gophKeeperServiceClient) ListAttachments(ctx context.Context, in *ListAttachmentsRequest, opts ...grpc.CallOption) (*ListAttachmentsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListAttachmentsResponse)
@@ -270,6 +296,10 @@ type GophKeeperServiceServer interface {
 	ListSecretVersions(context.Context, *ListSecretVersionsRequest) (*ListSecretVersionsResponse, error)
 	// Одна конкретная версия (если нужна без полного GetSecret).
 	GetSecretVersion(context.Context, *GetSecretVersionRequest) (*SecretVersion, error)
+	// Удалить версию секрета (только жёсткое удаление).
+	DeleteSecretVersion(context.Context, *DeleteSecretVersionRequest) (*DeleteSecretVersionResponse, error)
+	// Восстановить версию секрета (устанавливает её текущей для секрета).
+	RestoreSecretVersion(context.Context, *RestoreSecretVersionRequest) (*RestoreSecretVersionResponse, error)
 	// Вложения к версии секрета: список без тела файла.
 	ListAttachments(context.Context, *ListAttachmentsRequest) (*ListAttachmentsResponse, error)
 	// Скачать одно вложение целиком (метаданные + ciphertext).
@@ -320,6 +350,12 @@ func (UnimplementedGophKeeperServiceServer) ListSecretVersions(context.Context, 
 }
 func (UnimplementedGophKeeperServiceServer) GetSecretVersion(context.Context, *GetSecretVersionRequest) (*SecretVersion, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSecretVersion not implemented")
+}
+func (UnimplementedGophKeeperServiceServer) DeleteSecretVersion(context.Context, *DeleteSecretVersionRequest) (*DeleteSecretVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteSecretVersion not implemented")
+}
+func (UnimplementedGophKeeperServiceServer) RestoreSecretVersion(context.Context, *RestoreSecretVersionRequest) (*RestoreSecretVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RestoreSecretVersion not implemented")
 }
 func (UnimplementedGophKeeperServiceServer) ListAttachments(context.Context, *ListAttachmentsRequest) (*ListAttachmentsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAttachments not implemented")
@@ -552,6 +588,42 @@ func _GophKeeperService_GetSecretVersion_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GophKeeperService_DeleteSecretVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSecretVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GophKeeperServiceServer).DeleteSecretVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GophKeeperService_DeleteSecretVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GophKeeperServiceServer).DeleteSecretVersion(ctx, req.(*DeleteSecretVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GophKeeperService_RestoreSecretVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestoreSecretVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GophKeeperServiceServer).RestoreSecretVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GophKeeperService_RestoreSecretVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GophKeeperServiceServer).RestoreSecretVersion(ctx, req.(*RestoreSecretVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GophKeeperService_ListAttachments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListAttachmentsRequest)
 	if err := dec(in); err != nil {
@@ -674,6 +746,14 @@ var GophKeeperService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSecretVersion",
 			Handler:    _GophKeeperService_GetSecretVersion_Handler,
+		},
+		{
+			MethodName: "DeleteSecretVersion",
+			Handler:    _GophKeeperService_DeleteSecretVersion_Handler,
+		},
+		{
+			MethodName: "RestoreSecretVersion",
+			Handler:    _GophKeeperService_RestoreSecretVersion_Handler,
 		},
 		{
 			MethodName: "ListAttachments",

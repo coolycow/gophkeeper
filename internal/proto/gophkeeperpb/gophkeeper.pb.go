@@ -1182,6 +1182,198 @@ func (x *GetSecretVersionRequest) GetSecretVersionId() string {
 	return ""
 }
 
+type DeleteSecretVersionRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SecretId        string                 `protobuf:"bytes,1,opt,name=secret_id,json=secretId,proto3" json:"secret_id,omitempty"`
+	SecretVersionId string                 `protobuf:"bytes,2,opt,name=secret_version_id,json=secretVersionId,proto3" json:"secret_version_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DeleteSecretVersionRequest) Reset() {
+	*x = DeleteSecretVersionRequest{}
+	mi := &file_gophkeeper_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteSecretVersionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteSecretVersionRequest) ProtoMessage() {}
+
+func (x *DeleteSecretVersionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_gophkeeper_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteSecretVersionRequest.ProtoReflect.Descriptor instead.
+func (*DeleteSecretVersionRequest) Descriptor() ([]byte, []int) {
+	return file_gophkeeper_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DeleteSecretVersionRequest) GetSecretId() string {
+	if x != nil {
+		return x.SecretId
+	}
+	return ""
+}
+
+func (x *DeleteSecretVersionRequest) GetSecretVersionId() string {
+	if x != nil {
+		return x.SecretVersionId
+	}
+	return ""
+}
+
+type DeleteSecretVersionResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SecretVersionId string                 `protobuf:"bytes,1,opt,name=secret_version_id,json=secretVersionId,proto3" json:"secret_version_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DeleteSecretVersionResponse) Reset() {
+	*x = DeleteSecretVersionResponse{}
+	mi := &file_gophkeeper_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteSecretVersionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteSecretVersionResponse) ProtoMessage() {}
+
+func (x *DeleteSecretVersionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_gophkeeper_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteSecretVersionResponse.ProtoReflect.Descriptor instead.
+func (*DeleteSecretVersionResponse) Descriptor() ([]byte, []int) {
+	return file_gophkeeper_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *DeleteSecretVersionResponse) GetSecretVersionId() string {
+	if x != nil {
+		return x.SecretVersionId
+	}
+	return ""
+}
+
+type RestoreSecretVersionRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SecretId        string                 `protobuf:"bytes,1,opt,name=secret_id,json=secretId,proto3" json:"secret_id,omitempty"`
+	SecretVersionId string                 `protobuf:"bytes,2,opt,name=secret_version_id,json=secretVersionId,proto3" json:"secret_version_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RestoreSecretVersionRequest) Reset() {
+	*x = RestoreSecretVersionRequest{}
+	mi := &file_gophkeeper_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestoreSecretVersionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestoreSecretVersionRequest) ProtoMessage() {}
+
+func (x *RestoreSecretVersionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_gophkeeper_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestoreSecretVersionRequest.ProtoReflect.Descriptor instead.
+func (*RestoreSecretVersionRequest) Descriptor() ([]byte, []int) {
+	return file_gophkeeper_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RestoreSecretVersionRequest) GetSecretId() string {
+	if x != nil {
+		return x.SecretId
+	}
+	return ""
+}
+
+func (x *RestoreSecretVersionRequest) GetSecretVersionId() string {
+	if x != nil {
+		return x.SecretVersionId
+	}
+	return ""
+}
+
+type RestoreSecretVersionResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SecretVersionId string                 `protobuf:"bytes,1,opt,name=secret_version_id,json=secretVersionId,proto3" json:"secret_version_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RestoreSecretVersionResponse) Reset() {
+	*x = RestoreSecretVersionResponse{}
+	mi := &file_gophkeeper_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestoreSecretVersionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestoreSecretVersionResponse) ProtoMessage() {}
+
+func (x *RestoreSecretVersionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_gophkeeper_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestoreSecretVersionResponse.ProtoReflect.Descriptor instead.
+func (*RestoreSecretVersionResponse) Descriptor() ([]byte, []int) {
+	return file_gophkeeper_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RestoreSecretVersionResponse) GetSecretVersionId() string {
+	if x != nil {
+		return x.SecretVersionId
+	}
+	return ""
+}
+
 type AttachmentSummary struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1198,7 +1390,7 @@ type AttachmentSummary struct {
 
 func (x *AttachmentSummary) Reset() {
 	*x = AttachmentSummary{}
-	mi := &file_gophkeeper_proto_msgTypes[20]
+	mi := &file_gophkeeper_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1210,7 +1402,7 @@ func (x *AttachmentSummary) String() string {
 func (*AttachmentSummary) ProtoMessage() {}
 
 func (x *AttachmentSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_gophkeeper_proto_msgTypes[20]
+	mi := &file_gophkeeper_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1223,7 +1415,7 @@ func (x *AttachmentSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachmentSummary.ProtoReflect.Descriptor instead.
 func (*AttachmentSummary) Descriptor() ([]byte, []int) {
-	return file_gophkeeper_proto_rawDescGZIP(), []int{20}
+	return file_gophkeeper_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *AttachmentSummary) GetId() string {
@@ -1299,7 +1491,7 @@ type Attachment struct {
 
 func (x *Attachment) Reset() {
 	*x = Attachment{}
-	mi := &file_gophkeeper_proto_msgTypes[21]
+	mi := &file_gophkeeper_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1311,7 +1503,7 @@ func (x *Attachment) String() string {
 func (*Attachment) ProtoMessage() {}
 
 func (x *Attachment) ProtoReflect() protoreflect.Message {
-	mi := &file_gophkeeper_proto_msgTypes[21]
+	mi := &file_gophkeeper_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1324,7 +1516,7 @@ func (x *Attachment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Attachment.ProtoReflect.Descriptor instead.
 func (*Attachment) Descriptor() ([]byte, []int) {
-	return file_gophkeeper_proto_rawDescGZIP(), []int{21}
+	return file_gophkeeper_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *Attachment) GetId() string {
@@ -1403,7 +1595,7 @@ type ListAttachmentsRequest struct {
 
 func (x *ListAttachmentsRequest) Reset() {
 	*x = ListAttachmentsRequest{}
-	mi := &file_gophkeeper_proto_msgTypes[22]
+	mi := &file_gophkeeper_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1415,7 +1607,7 @@ func (x *ListAttachmentsRequest) String() string {
 func (*ListAttachmentsRequest) ProtoMessage() {}
 
 func (x *ListAttachmentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gophkeeper_proto_msgTypes[22]
+	mi := &file_gophkeeper_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1428,7 +1620,7 @@ func (x *ListAttachmentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAttachmentsRequest.ProtoReflect.Descriptor instead.
 func (*ListAttachmentsRequest) Descriptor() ([]byte, []int) {
-	return file_gophkeeper_proto_rawDescGZIP(), []int{22}
+	return file_gophkeeper_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListAttachmentsRequest) GetScope() isListAttachmentsRequest_Scope {
@@ -1481,7 +1673,7 @@ type ListAttachmentsResponse struct {
 
 func (x *ListAttachmentsResponse) Reset() {
 	*x = ListAttachmentsResponse{}
-	mi := &file_gophkeeper_proto_msgTypes[23]
+	mi := &file_gophkeeper_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1493,7 +1685,7 @@ func (x *ListAttachmentsResponse) String() string {
 func (*ListAttachmentsResponse) ProtoMessage() {}
 
 func (x *ListAttachmentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gophkeeper_proto_msgTypes[23]
+	mi := &file_gophkeeper_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1506,7 +1698,7 @@ func (x *ListAttachmentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAttachmentsResponse.ProtoReflect.Descriptor instead.
 func (*ListAttachmentsResponse) Descriptor() ([]byte, []int) {
-	return file_gophkeeper_proto_rawDescGZIP(), []int{23}
+	return file_gophkeeper_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListAttachmentsResponse) GetAttachments() []*AttachmentSummary {
@@ -1525,7 +1717,7 @@ type GetAttachmentRequest struct {
 
 func (x *GetAttachmentRequest) Reset() {
 	*x = GetAttachmentRequest{}
-	mi := &file_gophkeeper_proto_msgTypes[24]
+	mi := &file_gophkeeper_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1537,7 +1729,7 @@ func (x *GetAttachmentRequest) String() string {
 func (*GetAttachmentRequest) ProtoMessage() {}
 
 func (x *GetAttachmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gophkeeper_proto_msgTypes[24]
+	mi := &file_gophkeeper_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +1742,7 @@ func (x *GetAttachmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAttachmentRequest.ProtoReflect.Descriptor instead.
 func (*GetAttachmentRequest) Descriptor() ([]byte, []int) {
-	return file_gophkeeper_proto_rawDescGZIP(), []int{24}
+	return file_gophkeeper_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetAttachmentRequest) GetAttachmentId() string {
@@ -1573,7 +1765,7 @@ type CreateAttachmentRequest struct {
 
 func (x *CreateAttachmentRequest) Reset() {
 	*x = CreateAttachmentRequest{}
-	mi := &file_gophkeeper_proto_msgTypes[25]
+	mi := &file_gophkeeper_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1585,7 +1777,7 @@ func (x *CreateAttachmentRequest) String() string {
 func (*CreateAttachmentRequest) ProtoMessage() {}
 
 func (x *CreateAttachmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gophkeeper_proto_msgTypes[25]
+	mi := &file_gophkeeper_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1598,7 +1790,7 @@ func (x *CreateAttachmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAttachmentRequest.ProtoReflect.Descriptor instead.
 func (*CreateAttachmentRequest) Descriptor() ([]byte, []int) {
-	return file_gophkeeper_proto_rawDescGZIP(), []int{25}
+	return file_gophkeeper_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *CreateAttachmentRequest) GetSecretVersionId() string {
@@ -1645,7 +1837,7 @@ type DeleteAttachmentRequest struct {
 
 func (x *DeleteAttachmentRequest) Reset() {
 	*x = DeleteAttachmentRequest{}
-	mi := &file_gophkeeper_proto_msgTypes[26]
+	mi := &file_gophkeeper_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1657,7 +1849,7 @@ func (x *DeleteAttachmentRequest) String() string {
 func (*DeleteAttachmentRequest) ProtoMessage() {}
 
 func (x *DeleteAttachmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gophkeeper_proto_msgTypes[26]
+	mi := &file_gophkeeper_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1670,7 +1862,7 @@ func (x *DeleteAttachmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAttachmentRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAttachmentRequest) Descriptor() ([]byte, []int) {
-	return file_gophkeeper_proto_rawDescGZIP(), []int{26}
+	return file_gophkeeper_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *DeleteAttachmentRequest) GetAttachmentId() string {
@@ -1759,7 +1951,17 @@ const file_gophkeeper_proto_rawDesc = "" +
 	"\bversions\x18\x01 \x03(\v2\x1c.gophkeeper.v1.SecretVersionR\bversions\"b\n" +
 	"\x17GetSecretVersionRequest\x12\x1b\n" +
 	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12*\n" +
-	"\x11secret_version_id\x18\x02 \x01(\tR\x0fsecretVersionId\"\xcb\x02\n" +
+	"\x11secret_version_id\x18\x02 \x01(\tR\x0fsecretVersionId\"e\n" +
+	"\x1aDeleteSecretVersionRequest\x12\x1b\n" +
+	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12*\n" +
+	"\x11secret_version_id\x18\x02 \x01(\tR\x0fsecretVersionId\"I\n" +
+	"\x1bDeleteSecretVersionResponse\x12*\n" +
+	"\x11secret_version_id\x18\x01 \x01(\tR\x0fsecretVersionId\"f\n" +
+	"\x1bRestoreSecretVersionRequest\x12\x1b\n" +
+	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12*\n" +
+	"\x11secret_version_id\x18\x02 \x01(\tR\x0fsecretVersionId\"J\n" +
+	"\x1cRestoreSecretVersionResponse\x12*\n" +
+	"\x11secret_version_id\x18\x01 \x01(\tR\x0fsecretVersionId\"\xcb\x02\n" +
 	"\x11AttachmentSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11secret_version_id\x18\x02 \x01(\tR\x0fsecretVersionId\x12.\n" +
@@ -1802,7 +2004,7 @@ const file_gophkeeper_proto_rawDesc = "" +
 	"\x1dSECRET_LIST_SCOPE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dSECRET_LIST_SCOPE_ACTIVE_ONLY\x10\x01\x12\"\n" +
 	"\x1eSECRET_LIST_SCOPE_DELETED_ONLY\x10\x02\x12\x19\n" +
-	"\x15SECRET_LIST_SCOPE_ALL\x10\x032\xf6\t\n" +
+	"\x15SECRET_LIST_SCOPE_ALL\x10\x032\xd5\v\n" +
 	"\x11GophKeeperService\x12?\n" +
 	"\x04Ping\x12\x1a.gophkeeper.v1.PingRequest\x1a\x1b.gophkeeper.v1.PingResponse\x12G\n" +
 	"\bRegister\x12\x1e.gophkeeper.v1.RegisterRequest\x1a\x1b.gophkeeper.v1.AuthResponse\x12A\n" +
@@ -1814,7 +2016,9 @@ const file_gophkeeper_proto_rawDesc = "" +
 	"\fUpdateSecret\x12\".gophkeeper.v1.UpdateSecretRequest\x1a\x1c.gophkeeper.v1.SecretVersion\x12W\n" +
 	"\fDeleteSecret\x12\".gophkeeper.v1.DeleteSecretRequest\x1a#.gophkeeper.v1.DeleteSecretResponse\x12i\n" +
 	"\x12ListSecretVersions\x12(.gophkeeper.v1.ListSecretVersionsRequest\x1a).gophkeeper.v1.ListSecretVersionsResponse\x12X\n" +
-	"\x10GetSecretVersion\x12&.gophkeeper.v1.GetSecretVersionRequest\x1a\x1c.gophkeeper.v1.SecretVersion\x12`\n" +
+	"\x10GetSecretVersion\x12&.gophkeeper.v1.GetSecretVersionRequest\x1a\x1c.gophkeeper.v1.SecretVersion\x12l\n" +
+	"\x13DeleteSecretVersion\x12).gophkeeper.v1.DeleteSecretVersionRequest\x1a*.gophkeeper.v1.DeleteSecretVersionResponse\x12o\n" +
+	"\x14RestoreSecretVersion\x12*.gophkeeper.v1.RestoreSecretVersionRequest\x1a+.gophkeeper.v1.RestoreSecretVersionResponse\x12`\n" +
 	"\x0fListAttachments\x12%.gophkeeper.v1.ListAttachmentsRequest\x1a&.gophkeeper.v1.ListAttachmentsResponse\x12O\n" +
 	"\rGetAttachment\x12#.gophkeeper.v1.GetAttachmentRequest\x1a\x19.gophkeeper.v1.Attachment\x12U\n" +
 	"\x10CreateAttachment\x12&.gophkeeper.v1.CreateAttachmentRequest\x1a\x19.gophkeeper.v1.Attachment\x12c\n" +
@@ -1833,56 +2037,60 @@ func file_gophkeeper_proto_rawDescGZIP() []byte {
 }
 
 var file_gophkeeper_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_gophkeeper_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_gophkeeper_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_gophkeeper_proto_goTypes = []any{
-	(SecretListScope)(0),               // 0: gophkeeper.v1.SecretListScope
-	(*PingRequest)(nil),                // 1: gophkeeper.v1.PingRequest
-	(*PingResponse)(nil),               // 2: gophkeeper.v1.PingResponse
-	(*DeleteSecretResponse)(nil),       // 3: gophkeeper.v1.DeleteSecretResponse
-	(*DeleteAttachmentResponse)(nil),   // 4: gophkeeper.v1.DeleteAttachmentResponse
-	(*RegisterRequest)(nil),            // 5: gophkeeper.v1.RegisterRequest
-	(*LoginRequest)(nil),               // 6: gophkeeper.v1.LoginRequest
-	(*RefreshTokenRequest)(nil),        // 7: gophkeeper.v1.RefreshTokenRequest
-	(*AuthResponse)(nil),               // 8: gophkeeper.v1.AuthResponse
-	(*SecretSummary)(nil),              // 9: gophkeeper.v1.SecretSummary
-	(*ListSecretsRequest)(nil),         // 10: gophkeeper.v1.ListSecretsRequest
-	(*ListSecretsResponse)(nil),        // 11: gophkeeper.v1.ListSecretsResponse
-	(*GetSecretRequest)(nil),           // 12: gophkeeper.v1.GetSecretRequest
-	(*Secret)(nil),                     // 13: gophkeeper.v1.Secret
-	(*SecretVersion)(nil),              // 14: gophkeeper.v1.SecretVersion
-	(*CreateSecretRequest)(nil),        // 15: gophkeeper.v1.CreateSecretRequest
-	(*UpdateSecretRequest)(nil),        // 16: gophkeeper.v1.UpdateSecretRequest
-	(*DeleteSecretRequest)(nil),        // 17: gophkeeper.v1.DeleteSecretRequest
-	(*ListSecretVersionsRequest)(nil),  // 18: gophkeeper.v1.ListSecretVersionsRequest
-	(*ListSecretVersionsResponse)(nil), // 19: gophkeeper.v1.ListSecretVersionsResponse
-	(*GetSecretVersionRequest)(nil),    // 20: gophkeeper.v1.GetSecretVersionRequest
-	(*AttachmentSummary)(nil),          // 21: gophkeeper.v1.AttachmentSummary
-	(*Attachment)(nil),                 // 22: gophkeeper.v1.Attachment
-	(*ListAttachmentsRequest)(nil),     // 23: gophkeeper.v1.ListAttachmentsRequest
-	(*ListAttachmentsResponse)(nil),    // 24: gophkeeper.v1.ListAttachmentsResponse
-	(*GetAttachmentRequest)(nil),       // 25: gophkeeper.v1.GetAttachmentRequest
-	(*CreateAttachmentRequest)(nil),    // 26: gophkeeper.v1.CreateAttachmentRequest
-	(*DeleteAttachmentRequest)(nil),    // 27: gophkeeper.v1.DeleteAttachmentRequest
-	(*timestamppb.Timestamp)(nil),      // 28: google.protobuf.Timestamp
+	(SecretListScope)(0),                 // 0: gophkeeper.v1.SecretListScope
+	(*PingRequest)(nil),                  // 1: gophkeeper.v1.PingRequest
+	(*PingResponse)(nil),                 // 2: gophkeeper.v1.PingResponse
+	(*DeleteSecretResponse)(nil),         // 3: gophkeeper.v1.DeleteSecretResponse
+	(*DeleteAttachmentResponse)(nil),     // 4: gophkeeper.v1.DeleteAttachmentResponse
+	(*RegisterRequest)(nil),              // 5: gophkeeper.v1.RegisterRequest
+	(*LoginRequest)(nil),                 // 6: gophkeeper.v1.LoginRequest
+	(*RefreshTokenRequest)(nil),          // 7: gophkeeper.v1.RefreshTokenRequest
+	(*AuthResponse)(nil),                 // 8: gophkeeper.v1.AuthResponse
+	(*SecretSummary)(nil),                // 9: gophkeeper.v1.SecretSummary
+	(*ListSecretsRequest)(nil),           // 10: gophkeeper.v1.ListSecretsRequest
+	(*ListSecretsResponse)(nil),          // 11: gophkeeper.v1.ListSecretsResponse
+	(*GetSecretRequest)(nil),             // 12: gophkeeper.v1.GetSecretRequest
+	(*Secret)(nil),                       // 13: gophkeeper.v1.Secret
+	(*SecretVersion)(nil),                // 14: gophkeeper.v1.SecretVersion
+	(*CreateSecretRequest)(nil),          // 15: gophkeeper.v1.CreateSecretRequest
+	(*UpdateSecretRequest)(nil),          // 16: gophkeeper.v1.UpdateSecretRequest
+	(*DeleteSecretRequest)(nil),          // 17: gophkeeper.v1.DeleteSecretRequest
+	(*ListSecretVersionsRequest)(nil),    // 18: gophkeeper.v1.ListSecretVersionsRequest
+	(*ListSecretVersionsResponse)(nil),   // 19: gophkeeper.v1.ListSecretVersionsResponse
+	(*GetSecretVersionRequest)(nil),      // 20: gophkeeper.v1.GetSecretVersionRequest
+	(*DeleteSecretVersionRequest)(nil),   // 21: gophkeeper.v1.DeleteSecretVersionRequest
+	(*DeleteSecretVersionResponse)(nil),  // 22: gophkeeper.v1.DeleteSecretVersionResponse
+	(*RestoreSecretVersionRequest)(nil),  // 23: gophkeeper.v1.RestoreSecretVersionRequest
+	(*RestoreSecretVersionResponse)(nil), // 24: gophkeeper.v1.RestoreSecretVersionResponse
+	(*AttachmentSummary)(nil),            // 25: gophkeeper.v1.AttachmentSummary
+	(*Attachment)(nil),                   // 26: gophkeeper.v1.Attachment
+	(*ListAttachmentsRequest)(nil),       // 27: gophkeeper.v1.ListAttachmentsRequest
+	(*ListAttachmentsResponse)(nil),      // 28: gophkeeper.v1.ListAttachmentsResponse
+	(*GetAttachmentRequest)(nil),         // 29: gophkeeper.v1.GetAttachmentRequest
+	(*CreateAttachmentRequest)(nil),      // 30: gophkeeper.v1.CreateAttachmentRequest
+	(*DeleteAttachmentRequest)(nil),      // 31: gophkeeper.v1.DeleteAttachmentRequest
+	(*timestamppb.Timestamp)(nil),        // 32: google.protobuf.Timestamp
 }
 var file_gophkeeper_proto_depIdxs = []int32{
-	28, // 0: gophkeeper.v1.AuthResponse.expires_at:type_name -> google.protobuf.Timestamp
-	28, // 1: gophkeeper.v1.SecretSummary.updated_at:type_name -> google.protobuf.Timestamp
-	28, // 2: gophkeeper.v1.SecretSummary.deleted_at:type_name -> google.protobuf.Timestamp
+	32, // 0: gophkeeper.v1.AuthResponse.expires_at:type_name -> google.protobuf.Timestamp
+	32, // 1: gophkeeper.v1.SecretSummary.updated_at:type_name -> google.protobuf.Timestamp
+	32, // 2: gophkeeper.v1.SecretSummary.deleted_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: gophkeeper.v1.ListSecretsRequest.list_scope:type_name -> gophkeeper.v1.SecretListScope
 	9,  // 4: gophkeeper.v1.ListSecretsResponse.secrets:type_name -> gophkeeper.v1.SecretSummary
-	28, // 5: gophkeeper.v1.Secret.created_at:type_name -> google.protobuf.Timestamp
-	28, // 6: gophkeeper.v1.Secret.updated_at:type_name -> google.protobuf.Timestamp
-	28, // 7: gophkeeper.v1.Secret.deleted_at:type_name -> google.protobuf.Timestamp
+	32, // 5: gophkeeper.v1.Secret.created_at:type_name -> google.protobuf.Timestamp
+	32, // 6: gophkeeper.v1.Secret.updated_at:type_name -> google.protobuf.Timestamp
+	32, // 7: gophkeeper.v1.Secret.deleted_at:type_name -> google.protobuf.Timestamp
 	14, // 8: gophkeeper.v1.Secret.current_version:type_name -> gophkeeper.v1.SecretVersion
 	14, // 9: gophkeeper.v1.Secret.secret_versions:type_name -> gophkeeper.v1.SecretVersion
-	28, // 10: gophkeeper.v1.SecretVersion.created_at:type_name -> google.protobuf.Timestamp
-	28, // 11: gophkeeper.v1.SecretVersion.updated_at:type_name -> google.protobuf.Timestamp
-	28, // 12: gophkeeper.v1.SecretVersion.deleted_at:type_name -> google.protobuf.Timestamp
+	32, // 10: gophkeeper.v1.SecretVersion.created_at:type_name -> google.protobuf.Timestamp
+	32, // 11: gophkeeper.v1.SecretVersion.updated_at:type_name -> google.protobuf.Timestamp
+	32, // 12: gophkeeper.v1.SecretVersion.deleted_at:type_name -> google.protobuf.Timestamp
 	14, // 13: gophkeeper.v1.ListSecretVersionsResponse.versions:type_name -> gophkeeper.v1.SecretVersion
-	28, // 14: gophkeeper.v1.AttachmentSummary.created_at:type_name -> google.protobuf.Timestamp
-	28, // 15: gophkeeper.v1.Attachment.created_at:type_name -> google.protobuf.Timestamp
-	21, // 16: gophkeeper.v1.ListAttachmentsResponse.attachments:type_name -> gophkeeper.v1.AttachmentSummary
+	32, // 14: gophkeeper.v1.AttachmentSummary.created_at:type_name -> google.protobuf.Timestamp
+	32, // 15: gophkeeper.v1.Attachment.created_at:type_name -> google.protobuf.Timestamp
+	25, // 16: gophkeeper.v1.ListAttachmentsResponse.attachments:type_name -> gophkeeper.v1.AttachmentSummary
 	1,  // 17: gophkeeper.v1.GophKeeperService.Ping:input_type -> gophkeeper.v1.PingRequest
 	5,  // 18: gophkeeper.v1.GophKeeperService.Register:input_type -> gophkeeper.v1.RegisterRequest
 	6,  // 19: gophkeeper.v1.GophKeeperService.Login:input_type -> gophkeeper.v1.LoginRequest
@@ -1894,27 +2102,31 @@ var file_gophkeeper_proto_depIdxs = []int32{
 	17, // 25: gophkeeper.v1.GophKeeperService.DeleteSecret:input_type -> gophkeeper.v1.DeleteSecretRequest
 	18, // 26: gophkeeper.v1.GophKeeperService.ListSecretVersions:input_type -> gophkeeper.v1.ListSecretVersionsRequest
 	20, // 27: gophkeeper.v1.GophKeeperService.GetSecretVersion:input_type -> gophkeeper.v1.GetSecretVersionRequest
-	23, // 28: gophkeeper.v1.GophKeeperService.ListAttachments:input_type -> gophkeeper.v1.ListAttachmentsRequest
-	25, // 29: gophkeeper.v1.GophKeeperService.GetAttachment:input_type -> gophkeeper.v1.GetAttachmentRequest
-	26, // 30: gophkeeper.v1.GophKeeperService.CreateAttachment:input_type -> gophkeeper.v1.CreateAttachmentRequest
-	27, // 31: gophkeeper.v1.GophKeeperService.DeleteAttachment:input_type -> gophkeeper.v1.DeleteAttachmentRequest
-	2,  // 32: gophkeeper.v1.GophKeeperService.Ping:output_type -> gophkeeper.v1.PingResponse
-	8,  // 33: gophkeeper.v1.GophKeeperService.Register:output_type -> gophkeeper.v1.AuthResponse
-	8,  // 34: gophkeeper.v1.GophKeeperService.Login:output_type -> gophkeeper.v1.AuthResponse
-	8,  // 35: gophkeeper.v1.GophKeeperService.RefreshToken:output_type -> gophkeeper.v1.AuthResponse
-	11, // 36: gophkeeper.v1.GophKeeperService.ListSecrets:output_type -> gophkeeper.v1.ListSecretsResponse
-	13, // 37: gophkeeper.v1.GophKeeperService.GetSecret:output_type -> gophkeeper.v1.Secret
-	13, // 38: gophkeeper.v1.GophKeeperService.CreateSecret:output_type -> gophkeeper.v1.Secret
-	14, // 39: gophkeeper.v1.GophKeeperService.UpdateSecret:output_type -> gophkeeper.v1.SecretVersion
-	3,  // 40: gophkeeper.v1.GophKeeperService.DeleteSecret:output_type -> gophkeeper.v1.DeleteSecretResponse
-	19, // 41: gophkeeper.v1.GophKeeperService.ListSecretVersions:output_type -> gophkeeper.v1.ListSecretVersionsResponse
-	14, // 42: gophkeeper.v1.GophKeeperService.GetSecretVersion:output_type -> gophkeeper.v1.SecretVersion
-	24, // 43: gophkeeper.v1.GophKeeperService.ListAttachments:output_type -> gophkeeper.v1.ListAttachmentsResponse
-	22, // 44: gophkeeper.v1.GophKeeperService.GetAttachment:output_type -> gophkeeper.v1.Attachment
-	22, // 45: gophkeeper.v1.GophKeeperService.CreateAttachment:output_type -> gophkeeper.v1.Attachment
-	4,  // 46: gophkeeper.v1.GophKeeperService.DeleteAttachment:output_type -> gophkeeper.v1.DeleteAttachmentResponse
-	32, // [32:47] is the sub-list for method output_type
-	17, // [17:32] is the sub-list for method input_type
+	21, // 28: gophkeeper.v1.GophKeeperService.DeleteSecretVersion:input_type -> gophkeeper.v1.DeleteSecretVersionRequest
+	23, // 29: gophkeeper.v1.GophKeeperService.RestoreSecretVersion:input_type -> gophkeeper.v1.RestoreSecretVersionRequest
+	27, // 30: gophkeeper.v1.GophKeeperService.ListAttachments:input_type -> gophkeeper.v1.ListAttachmentsRequest
+	29, // 31: gophkeeper.v1.GophKeeperService.GetAttachment:input_type -> gophkeeper.v1.GetAttachmentRequest
+	30, // 32: gophkeeper.v1.GophKeeperService.CreateAttachment:input_type -> gophkeeper.v1.CreateAttachmentRequest
+	31, // 33: gophkeeper.v1.GophKeeperService.DeleteAttachment:input_type -> gophkeeper.v1.DeleteAttachmentRequest
+	2,  // 34: gophkeeper.v1.GophKeeperService.Ping:output_type -> gophkeeper.v1.PingResponse
+	8,  // 35: gophkeeper.v1.GophKeeperService.Register:output_type -> gophkeeper.v1.AuthResponse
+	8,  // 36: gophkeeper.v1.GophKeeperService.Login:output_type -> gophkeeper.v1.AuthResponse
+	8,  // 37: gophkeeper.v1.GophKeeperService.RefreshToken:output_type -> gophkeeper.v1.AuthResponse
+	11, // 38: gophkeeper.v1.GophKeeperService.ListSecrets:output_type -> gophkeeper.v1.ListSecretsResponse
+	13, // 39: gophkeeper.v1.GophKeeperService.GetSecret:output_type -> gophkeeper.v1.Secret
+	13, // 40: gophkeeper.v1.GophKeeperService.CreateSecret:output_type -> gophkeeper.v1.Secret
+	14, // 41: gophkeeper.v1.GophKeeperService.UpdateSecret:output_type -> gophkeeper.v1.SecretVersion
+	3,  // 42: gophkeeper.v1.GophKeeperService.DeleteSecret:output_type -> gophkeeper.v1.DeleteSecretResponse
+	19, // 43: gophkeeper.v1.GophKeeperService.ListSecretVersions:output_type -> gophkeeper.v1.ListSecretVersionsResponse
+	14, // 44: gophkeeper.v1.GophKeeperService.GetSecretVersion:output_type -> gophkeeper.v1.SecretVersion
+	22, // 45: gophkeeper.v1.GophKeeperService.DeleteSecretVersion:output_type -> gophkeeper.v1.DeleteSecretVersionResponse
+	24, // 46: gophkeeper.v1.GophKeeperService.RestoreSecretVersion:output_type -> gophkeeper.v1.RestoreSecretVersionResponse
+	28, // 47: gophkeeper.v1.GophKeeperService.ListAttachments:output_type -> gophkeeper.v1.ListAttachmentsResponse
+	26, // 48: gophkeeper.v1.GophKeeperService.GetAttachment:output_type -> gophkeeper.v1.Attachment
+	26, // 49: gophkeeper.v1.GophKeeperService.CreateAttachment:output_type -> gophkeeper.v1.Attachment
+	4,  // 50: gophkeeper.v1.GophKeeperService.DeleteAttachment:output_type -> gophkeeper.v1.DeleteAttachmentResponse
+	34, // [34:51] is the sub-list for method output_type
+	17, // [17:34] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
 	17, // [17:17] is the sub-list for extension extendee
 	0,  // [0:17] is the sub-list for field type_name
@@ -1925,7 +2137,7 @@ func file_gophkeeper_proto_init() {
 	if File_gophkeeper_proto != nil {
 		return
 	}
-	file_gophkeeper_proto_msgTypes[22].OneofWrappers = []any{
+	file_gophkeeper_proto_msgTypes[26].OneofWrappers = []any{
 		(*ListAttachmentsRequest_SecretId)(nil),
 		(*ListAttachmentsRequest_SecretVersionId)(nil),
 	}
@@ -1935,7 +2147,7 @@ func file_gophkeeper_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gophkeeper_proto_rawDesc), len(file_gophkeeper_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   27,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
