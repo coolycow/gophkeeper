@@ -182,8 +182,8 @@ func TestInitConfigServerWithEnv_supportedVars(t *testing.T) {
 		{
 			name: "log and database",
 			env: map[string]string{
-				"LOG_LEVEL":    "warn",
-				"DATABASE_DSN": "postgres://x",
+				"LOG_LEVEL":      "warn",
+				"DATABASE_DSN":   "postgres://x",
 				"RUN_MIGRATIONS": "true",
 			},
 			want: func(t *testing.T, c *ConfigServer) {
@@ -208,11 +208,11 @@ func TestInitConfigServerWithEnv_supportedVars(t *testing.T) {
 		{
 			name: "secret and crypto params",
 			env: map[string]string{
-				"SECRET_KEY":             "01234567890123456789012345678901",
-				"SECRET_VERSION_COUNT":   "5",
-				"SALT_LENGTH":            "24",
-				"MIN_PASSWORD_LENGTH":    "10",
-				"MAX_PASSWORD_LENGTH":    "128",
+				"SECRET_KEY":           "01234567890123456789012345678901",
+				"SECRET_VERSION_COUNT": "5",
+				"SALT_LENGTH":          "24",
+				"MIN_PASSWORD_LENGTH":  "10",
+				"MAX_PASSWORD_LENGTH":  "128",
 			},
 			want: func(t *testing.T, c *ConfigServer) {
 				assert.Equal(t, "01234567890123456789012345678901", c.SecretKey)

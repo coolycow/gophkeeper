@@ -14,12 +14,14 @@ import (
 // ConfigClient Структура для хранения конфигурации клиента
 type ConfigClient struct {
 	ServerAddress string `env:"SERVER_ADDRESS" json:"server_address,omitempty"` // Адрес сервера
+	Email         string `env:"EMAIL" json:"email,omitempty"`                   // Email по умолчанию
 	Config        string `env:"CONFIG" json:"config,omitempty"`                 // Путь к файлу конфигурации
 }
 
 // fileConfigClient — JSON-файл; указатели задают поля, явно присутствующие в файле.
 type fileConfigClient struct {
 	ServerAddress *string `json:"server_address"` // Адрес сервера
+	Email         *string `json:"email"`          // Email по умолчанию
 	Config        *string `json:"config"`         // Путь к файлу конфигурации
 }
 
@@ -30,7 +32,7 @@ func (c *ConfigClient) PrintConfig() {
 	logger.Log.Info(b.String())
 }
 
-// initConfigWithEnv получение настроек из переменных окружения.
+// initConfigClientWithEnv получение настроек из переменных окружения.
 func initConfigClientWithEnv(config *ConfigClient) (*ConfigClient, error) {
 	return applyEnvToConfigClient(config, false)
 }
@@ -83,17 +85,21 @@ func InitConfigClient() (*ConfigClient, error) {
 	return &cfg, errors.Join(errs...)
 }
 
-// InitConfigWithArgs инициализация с переданными аргументами (только флаги; как раньше для тестов).
+// InitConfigClientWithArgs инициализация с переданными аргументами (только флаги; как раньше для тестов).
 func InitConfigClientWithArgs(args []string) (*ConfigClient, error) {
 	cfg, _, err := parseClientFlags(args)
 	return cfg, err
 }
 
-// applyEnvToConfig применяет переменные окружения. Если skipConfigFromEnv, CONFIG не трогаем
+// applyEnvToConfigClient применяет переменные окружения. Если skipConfigFromEnv, CONFIG не трогаем
 // (путь к файлу задан явно флагом -c).
 func applyEnvToConfigClient(config *ConfigClient, skipConfigFromEnv bool) (*ConfigClient, error) {
 	if serverAddress, present := os.LookupEnv("SERVER_ADDRESS"); present {
 		config.ServerAddress = serverAddress
+	}
+
+	if Email, present := os.LookupEnv("EMAIL"); present {
+		config.Email = Email
 	}
 
 	if !skipConfigFromEnv {
@@ -113,6 +119,7 @@ func parseClientFlags(args []string) (*ConfigClient, *flag.FlagSet, error) {
 
 	// Флаги для клиента
 	flagSet.StringVarP(&config.ServerAddress, "server-address", "a", "127.0.0.1:8080", "server address")
+	flagSet.StringVarP(&config.Email, "email", "m", "", "email")
 	flagSet.StringVarP(&config.Config, "config", "c", getDefaultConfigFile(), "config file")
 
 	// Парсим флаги
@@ -155,6 +162,9 @@ func mergeConfigClientFromFile(cfg *ConfigClient, path string) error {
 func applyExplicitClientFlags(dst *ConfigClient, src *ConfigClient, fs *flag.FlagSet) {
 	if fs.Changed("server-address") {
 		dst.ServerAddress = src.ServerAddress
+	}
+	if fs.Changed("email") {
+		dst.Email = src.Email
 	}
 	if fs.Changed("config") {
 		dst.Config = strings.TrimSpace(src.Config)
