@@ -87,13 +87,19 @@ func NewEvent(action, userID, secretID, secretVersionID, attachmentID string) *m
 }
 
 // NewNotifier создаёт Notifier: при auditFile != "" — запись в файл, при auditURL != "" — отправка на URL.
+// Если оба параметра не пустые, то запись в файл и отправка на URL.
 func NewNotifier(auditFile, auditURL string) *Notifier {
 	n := &Notifier{}
+
+	// Если файл не пустой, то добавляем приёмник в файл
 	if auditFile != "" {
 		n.AddReceiver(NewFileReceiver(auditFile))
 	}
+
+	// Если URL не пустой, то добавляем приёмник в URL
 	if auditURL != "" {
 		n.AddReceiver(NewURLReceiver(auditURL))
 	}
+
 	return n
 }

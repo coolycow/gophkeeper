@@ -29,6 +29,8 @@ type fileConfigClient struct {
 func (c *ConfigClient) PrintConfig() {
 	var b strings.Builder
 	fmt.Fprintf(&b, "config: ServerAddress=%s", c.ServerAddress)
+	fmt.Fprintf(&b, "config: Email=%s", c.Email)
+	fmt.Fprintf(&b, "config: Config=%s", c.Config)
 	logger.Log.Info(b.String())
 }
 
@@ -153,6 +155,10 @@ func mergeConfigClientFromFile(cfg *ConfigClient, path string) error {
 
 	if fc.ServerAddress != nil {
 		cfg.ServerAddress = *fc.ServerAddress
+	}
+
+	if fc.Email != nil {
+		cfg.Email = *fc.Email
 	}
 
 	return nil

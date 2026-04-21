@@ -531,7 +531,7 @@ func getDefaultSaltLength() int {
 	return 32
 }
 
-// getDefaultAuditFile файл аудита по умолчанию
+// getDefaultAuditFile файл аудита по умолчанию (т.к. задаётся реальное название, то аудит будет записываться в файл если принудительно не передать пустое значение)
 func getDefaultAuditFile() string {
 	return "audit.json"
 }

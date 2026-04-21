@@ -25,25 +25,30 @@ func NewURLReceiver(auditURL string) *URLReceiver {
 
 // Send отправляет событие POST-запросом с JSON-телом (с автоматическими ретраями).
 func (u *URLReceiver) Send(event *model.Audit) error {
+	// Преобразуем событие в JSON
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("marshal audit event: %w", err)
 	}
 
+	// Создаём запрос
 	req, err := retryablehttp.NewRequest(http.MethodPost, u.url, data)
 	if err != nil {
 		return fmt.Errorf("create audit request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	// Отправляем запрос
 	resp, err := u.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("send audit event to %s: %w", u.url, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Если статус ответа не в диапазоне 200-299, возвращаем ошибку
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("audit endpoint returned status %d", resp.StatusCode)
 	}
+
 	return nil
 }
