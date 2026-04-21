@@ -235,6 +235,43 @@ func (r *PostgresRepository) GetUsersCount(ctx context.Context) int {
 	return int(count)
 }
 
+// //////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ REFRESH-ТОКЕНОВ //////////////////////////////////////////////////////////////
+// CreateRefreshToken создаёт запись refresh-токена (в БД только SHA-256 от переданной клиенту строки).
+func (r *PostgresRepository) CreateRefreshToken(ctx context.Context, userID string, tokenHash []byte, expiresAt time.Time) (*model.RefreshToken, error) {
+	row := r.db.QueryRowContext(ctx,
+		`insert into refresh_tokens (user_id, token_hash, expires_at) values ($1, $2, $3)
+		returning id, user_id, token_hash, expires_at, created_at`,
+		userID, tokenHash, expiresAt)
+
+	var t model.RefreshToken
+	err := row.Scan(&t.ID, &t.UserID, &t.TokenHash, &t.ExpiresAt, &t.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+// DeleteRefreshToken удаляет запись refresh-токена по первичному ключу.
+func (r *PostgresRepository) DeleteRefreshToken(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, `delete from refresh_tokens where id = $1`, id)
+	return err
+}
+
+// FindValidRefreshTokenByHash возвращает неистёкшую запись с данным хэшем или sql.ErrNoRows.
+func (r *PostgresRepository) FindValidRefreshTokenByHash(ctx context.Context, tokenHash []byte, now time.Time) (*model.RefreshToken, error) {
+	row := r.db.QueryRowContext(ctx,
+		`select id, user_id, token_hash, expires_at, created_at from refresh_tokens
+		where token_hash = $1 and expires_at > $2`,
+		tokenHash, now)
+
+	var t model.RefreshToken
+	err := row.Scan(&t.ID, &t.UserID, &t.TokenHash, &t.ExpiresAt, &t.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 ////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С СЕКРЕТАМИ //////////////////////////////////////////////////////////////
 
 // GetSecretByID получает секрет по его ID

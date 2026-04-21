@@ -6,6 +6,7 @@ require (
 	github.com/gin-gonic/contrib v0.0.0-20260101091603-d12f07a9136b
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.2
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/kisielk/errcheck v1.10.0

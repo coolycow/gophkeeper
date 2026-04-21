@@ -39,6 +39,8 @@ func TestInitConfigServerWithArgs_defaults(t *testing.T) {
 	assert.Equal(t, getDefaultMaxPasswordLength(), cfg.MaxPasswordLength)
 	assert.Empty(t, cfg.AuditFile)
 	assert.Empty(t, cfg.AuditURL)
+	assert.Equal(t, getDefaultAccessTokenTTLMinutes(), cfg.AccessTokenTTLMinutes)
+	assert.Equal(t, getDefaultRefreshTokenTTLHours(), cfg.RefreshTokenTTLHours)
 }
 
 func TestInitConfigServerWithArgs_flags(t *testing.T) {
@@ -149,6 +151,14 @@ func TestInitConfigServerWithArgs_flags(t *testing.T) {
 				assert.Equal(t, "http://localhost/audit", c.AuditURL)
 			},
 		},
+		{
+			name: "jwt and refresh ttl",
+			args: []string{"--access-token-ttl-min", "30", "--refresh-token-ttl-hours", "720"},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, 30, c.AccessTokenTTLMinutes)
+				assert.Equal(t, 720, c.RefreshTokenTTLHours)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -233,6 +243,17 @@ func TestInitConfigServerWithEnv_supportedVars(t *testing.T) {
 				assert.Equal(t, "audit.json", c.AuditFile)
 				assert.Equal(t, "http://audit", c.AuditURL)
 				assert.Equal(t, "10.0.0.0/8", c.TrustedSubnet)
+			},
+		},
+		{
+			name: "token ttl",
+			env: map[string]string{
+				"ACCESS_TOKEN_TTL_MIN": "60",
+				"REFRESH_TOKEN_TTL_H":  "24",
+			},
+			want: func(t *testing.T, c *ConfigServer) {
+				assert.Equal(t, 60, c.AccessTokenTTLMinutes)
+				assert.Equal(t, 24, c.RefreshTokenTTLHours)
 			},
 		},
 		{

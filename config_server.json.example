@@ -15,5 +15,7 @@
   "min_password_length": 3,
   "max_password_length": 255,
   "audit_file": "audit.json",
-  "audit_url": ""
+  "audit_url": "",
+  "access_token_ttl_minutes": 15,
+  "refresh_token_ttl_hours": 168
 }

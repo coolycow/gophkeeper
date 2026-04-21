@@ -17,46 +17,50 @@ import (
 
 // Config Структура для хранения конфигурации, задаются соответствия ENV
 type ConfigServer struct {
-	Host               string `env:"HOST" json:"host,omitempty"`                                 // IP адрес сервера
-	Port               int    `env:"PORT" json:"port,omitempty"`                                 // Порт сервера
-	LogLevel           string `env:"LOG_LEVEL" json:"log_level,omitempty"`                       // Уровень логирования
-	DatabaseDSN        string `env:"DATABASE_DSN" json:"database_dsn,omitempty"`                 // DSN для подключения к БД
-	RunMigrations      bool   `env:"RUN_MIGRATIONS" json:"run_migrations,omitempty"`             // Флаг для запуска миграций
-	EnableHTTPS        bool   `env:"ENABLE_HTTPS" json:"enable_https,omitempty"`                 // Флаг для включения HTTPS
-	TLSCertFile        string `env:"TLS_CERT_FILE" json:"tls_cert_file,omitempty"`               // Файл сертификата для HTTPS
-	TLSKeyFile         string `env:"TLS_KEY_FILE" json:"tls_key_file,omitempty"`                 // Файл ключа для HTTPS
-	TrustedSubnet      string `env:"TRUSTED_SUBNET" json:"trusted_subnet,omitempty"`             // Подсеть для доступа к статистике
-	Config             string `env:"CONFIG" json:"config,omitempty"`                             // Путь к файлу конфигурации
-	GrpcPort           int    `env:"GRPC_PORT" json:"grpc_port,omitempty"`                       // Порт для gRPC
-	SecretKey          string `env:"SECRET_KEY" json:"secret_key,omitempty"`                     // Секретный ключ для шифрования данных
-	SecretVersionCount int    `env:"SECRET_VERSION_COUNT" json:"secret_version_count,omitempty"` // Максимальное количество версий записи (0 - не ограничено)
-	SaltLength         int    `env:"SALT_LENGTH" json:"salt_length,omitempty"`                   // Длина соли для шифрования данных
-	MinPasswordLength  int    `env:"MIN_PASSWORD_LENGTH" json:"min_password_length,omitempty"`   // Минимальная длина пароля
-	MaxPasswordLength  int    `env:"MAX_PASSWORD_LENGTH" json:"max_password_length,omitempty"`   // Максимальная длина пароля
-	AuditFile          string `env:"AUDIT_FILE" json:"audit_file,omitempty"`                     // Путь к файлу аудита
-	AuditURL           string `env:"AUDIT_URL" json:"audit_url,omitempty"`                       // URL для отправки аудита
+	Host                  string `env:"HOST" json:"host,omitempty"`                                     // IP адрес сервера
+	Port                  int    `env:"PORT" json:"port,omitempty"`                                     // Порт сервера
+	LogLevel              string `env:"LOG_LEVEL" json:"log_level,omitempty"`                           // Уровень логирования
+	DatabaseDSN           string `env:"DATABASE_DSN" json:"database_dsn,omitempty"`                     // DSN для подключения к БД
+	RunMigrations         bool   `env:"RUN_MIGRATIONS" json:"run_migrations,omitempty"`                 // Флаг для запуска миграций
+	EnableHTTPS           bool   `env:"ENABLE_HTTPS" json:"enable_https,omitempty"`                     // Флаг для включения HTTPS
+	TLSCertFile           string `env:"TLS_CERT_FILE" json:"tls_cert_file,omitempty"`                   // Файл сертификата для HTTPS
+	TLSKeyFile            string `env:"TLS_KEY_FILE" json:"tls_key_file,omitempty"`                     // Файл ключа для HTTPS
+	TrustedSubnet         string `env:"TRUSTED_SUBNET" json:"trusted_subnet,omitempty"`                 // Подсеть для доступа к статистике
+	Config                string `env:"CONFIG" json:"config,omitempty"`                                 // Путь к файлу конфигурации
+	GrpcPort              int    `env:"GRPC_PORT" json:"grpc_port,omitempty"`                           // Порт для gRPC
+	SecretKey             string `env:"SECRET_KEY" json:"secret_key,omitempty"`                         // Секретный ключ для шифрования данных
+	SecretVersionCount    int    `env:"SECRET_VERSION_COUNT" json:"secret_version_count,omitempty"`     // Максимальное количество версий записи (0 - не ограничено)
+	SaltLength            int    `env:"SALT_LENGTH" json:"salt_length,omitempty"`                       // Длина соли для шифрования данных
+	MinPasswordLength     int    `env:"MIN_PASSWORD_LENGTH" json:"min_password_length,omitempty"`       // Минимальная длина пароля
+	MaxPasswordLength     int    `env:"MAX_PASSWORD_LENGTH" json:"max_password_length,omitempty"`       // Максимальная длина пароля
+	AuditFile             string `env:"AUDIT_FILE" json:"audit_file,omitempty"`                         // Путь к файлу аудита
+	AuditURL              string `env:"AUDIT_URL" json:"audit_url,omitempty"`                           // URL для отправки аудита
+	AccessTokenTTLMinutes int    `env:"ACCESS_TOKEN_TTL_MIN" json:"access_token_ttl_minutes,omitempty"` // Срок жизни JWT access (минуты)
+	RefreshTokenTTLHours  int    `env:"REFRESH_TOKEN_TTL_H" json:"refresh_token_ttl_hours,omitempty"`   // Срок жизни refresh в БД (часы)
 }
 
 // fileConfig — JSON-файл; указатели задают поля, явно присутствующие в файле.
 // Ключ "config" в файле не разбираем (путь к файлу только из -c / CONFIG).
 type fileConfigServer struct {
-	Host               *string `json:"host"`                 // IP адрес сервера
-	Port               *int    `json:"port"`                 // Порт сервера
-	LogLevel           *string `json:"log_level"`            // Уровень логирования
-	DatabaseDSN        *string `json:"database_dsn"`         // DSN для подключения к БД
-	RunMigrations      *bool   `json:"run_migrations"`       // Флаг для запуска миграций
-	EnableHTTPS        *bool   `json:"enable_https"`         // Флаг для включения HTTPS
-	TLSCertFile        *string `json:"tls_cert_file"`        // Файл сертификата для HTTPS
-	TLSKeyFile         *string `json:"tls_key_file"`         // Файл ключа для HTTPS
-	TrustedSubnet      *string `json:"trusted_subnet"`       // Подсеть для доступа к статистике
-	GrpcPort           *int    `json:"grpc_port"`            // Порт для gRPC
-	SecretKey          *string `json:"secret_key"`           // Секретный ключ для шифрования данных
-	SecretVersionCount *int    `json:"secret_version_count"` // Максимальное количество версий записи (0 - не ограничено)
-	SaltLength         *int    `json:"salt_length"`          // Длина соли для шифрования данных
-	MinPasswordLength  *int    `json:"min_password_length"`  // Минимальная длина пароля
-	MaxPasswordLength  *int    `json:"max_password_length"`  // Максимальная длина пароля
-	AuditFile          *string `json:"audit_file"`           // Путь к файлу аудита
-	AuditURL           *string `json:"audit_url"`            // URL для отправки аудита
+	Host                  *string `json:"host"`                     // IP адрес сервера
+	Port                  *int    `json:"port"`                     // Порт сервера
+	LogLevel              *string `json:"log_level"`                // Уровень логирования
+	DatabaseDSN           *string `json:"database_dsn"`             // DSN для подключения к БД
+	RunMigrations         *bool   `json:"run_migrations"`           // Флаг для запуска миграций
+	EnableHTTPS           *bool   `json:"enable_https"`             // Флаг для включения HTTPS
+	TLSCertFile           *string `json:"tls_cert_file"`            // Файл сертификата для HTTPS
+	TLSKeyFile            *string `json:"tls_key_file"`             // Файл ключа для HTTPS
+	TrustedSubnet         *string `json:"trusted_subnet"`           // Подсеть для доступа к статистике
+	GrpcPort              *int    `json:"grpc_port"`                // Порт для gRPC
+	SecretKey             *string `json:"secret_key"`               // Секретный ключ для шифрования данных
+	SecretVersionCount    *int    `json:"secret_version_count"`     // Максимальное количество версий записи (0 - не ограничено)
+	SaltLength            *int    `json:"salt_length"`              // Длина соли для шифрования данных
+	MinPasswordLength     *int    `json:"min_password_length"`      // Минимальная длина пароля
+	MaxPasswordLength     *int    `json:"max_password_length"`      // Максимальная длина пароля
+	AuditFile             *string `json:"audit_file"`               // Путь к файлу аудита
+	AuditURL              *string `json:"audit_url"`                // URL для отправки аудита
+	AccessTokenTTLMinutes *int    `json:"access_token_ttl_minutes"` // JWT access TTL (минуты)
+	RefreshTokenTTLHours  *int    `json:"refresh_token_ttl_hours"`  // refresh TTL (часы)
 }
 
 // GetServerAddress возвращает полный адрес сервера для его запуска
@@ -80,6 +84,7 @@ func (c *ConfigServer) PrintConfig() {
 		c.EnableHTTPS, c.TLSCertFile, c.TLSKeyFile, c.TrustedSubnet, c.Config)
 	fmt.Fprintf(&b, "SecretVersionCount=%d; ", c.SecretVersionCount)
 	fmt.Fprintf(&b, "SaltLength=%d MinPasswordLength=%d MaxPasswordLength=%d; ", c.SaltLength, c.MinPasswordLength, c.MaxPasswordLength)
+	fmt.Fprintf(&b, "AccessTokenTTLMinutes=%d RefreshTokenTTLHours=%d; ", c.AccessTokenTTLMinutes, c.RefreshTokenTTLHours)
 	fmt.Fprintf(&b, "AuditFile=%s AuditURL=%s; ", c.AuditFile, c.AuditURL)
 	// Выводим настройки в лог
 	logger.Log.Info(b.String())
@@ -170,6 +175,13 @@ func InitConfigServer() (*ConfigServer, error) {
 		errs = append(errs, errors.New("secret version count must be less than 10000"))
 	}
 
+	if cfg.AccessTokenTTLMinutes < 1 || cfg.AccessTokenTTLMinutes > 1440 {
+		errs = append(errs, errors.New("access_token_ttl_minutes must be between 1 and 1440"))
+	}
+	if cfg.RefreshTokenTTLHours < 1 || cfg.RefreshTokenTTLHours > 8760 {
+		errs = append(errs, errors.New("refresh_token_ttl_hours must be between 1 and 8760"))
+	}
+
 	return &cfg, errors.Join(errs...)
 }
 
@@ -251,6 +263,15 @@ func applyEnvToConfigServer(config *ConfigServer, skipConfigFromEnv bool) (*Conf
 		config.AuditURL = auditURL
 	}
 
+	if err := parseIntFromEnv(config, "ACCESS_TOKEN_TTL_MIN",
+		func(c *ConfigServer, v int) { c.AccessTokenTTLMinutes = v }); err != nil {
+		return nil, err
+	}
+	if err := parseIntFromEnv(config, "REFRESH_TOKEN_TTL_H",
+		func(c *ConfigServer, v int) { c.RefreshTokenTTLHours = v }); err != nil {
+		return nil, err
+	}
+
 	if !skipConfigFromEnv {
 		if configFile, present := os.LookupEnv("CONFIG"); present {
 			config.Config = strings.TrimSpace(configFile)
@@ -313,6 +334,10 @@ func parseServerFlags(args []string) (*ConfigServer, *flag.FlagSet, error) {
 	flagSet.StringVarP(&config.AuditFile, "audit-file", "a", "", "audit file")
 	flagSet.StringVarP(&config.AuditURL, "audit-url", "b", "", "audit URL")
 
+	// JWT access и refresh в БД
+	flagSet.IntVar(&config.AccessTokenTTLMinutes, "access-token-ttl-min", getDefaultAccessTokenTTLMinutes(), "JWT access token TTL in minutes")
+	flagSet.IntVar(&config.RefreshTokenTTLHours, "refresh-token-ttl-hours", getDefaultRefreshTokenTTLHours(), "opaque refresh token TTL stored in DB (hours)")
+
 	// Парсим флаги
 	err := flagSet.Parse(args)
 	if err != nil {
@@ -325,24 +350,26 @@ func parseServerFlags(args []string) (*ConfigServer, *flag.FlagSet, error) {
 // defaultConfigServer возвращает конфигурацию сервера по умолчанию
 func defaultConfigServer() ConfigServer {
 	return ConfigServer{
-		Host:               "127.0.0.1",
-		Port:               8080,
-		LogLevel:           "info",
-		DatabaseDSN:        getDefaultDatabaseDSN(),
-		RunMigrations:      false,
-		EnableHTTPS:        false,
-		TLSCertFile:        getDefaultTLSCertFile(),
-		TLSKeyFile:         getDefaultTLSKeyFile(),
-		TrustedSubnet:      "",
-		Config:             "",
-		GrpcPort:           0,
-		SecretKey:          getDefaultSecretKey(),
-		SecretVersionCount: 10,
-		SaltLength:         getDefaultSaltLength(),
-		MinPasswordLength:  getDefaultMinPasswordLength(),
-		MaxPasswordLength:  getDefaultMaxPasswordLength(),
-		AuditFile:          getDefaultAuditFile(),
-		AuditURL:           getDefaultAuditURL(),
+		Host:                  "127.0.0.1",
+		Port:                  8080,
+		LogLevel:              "info",
+		DatabaseDSN:           getDefaultDatabaseDSN(),
+		RunMigrations:         false,
+		EnableHTTPS:           false,
+		TLSCertFile:           getDefaultTLSCertFile(),
+		TLSKeyFile:            getDefaultTLSKeyFile(),
+		TrustedSubnet:         "",
+		Config:                "",
+		GrpcPort:              0,
+		SecretKey:             getDefaultSecretKey(),
+		SecretVersionCount:    10,
+		SaltLength:            getDefaultSaltLength(),
+		MinPasswordLength:     getDefaultMinPasswordLength(),
+		MaxPasswordLength:     getDefaultMaxPasswordLength(),
+		AuditFile:             getDefaultAuditFile(),
+		AuditURL:              getDefaultAuditURL(),
+		AccessTokenTTLMinutes: getDefaultAccessTokenTTLMinutes(),
+		RefreshTokenTTLHours:  getDefaultRefreshTokenTTLHours(),
 	}
 }
 
@@ -413,6 +440,12 @@ func mergeConfigServerFromFile(cfg *ConfigServer, path string) error {
 	if fc.AuditURL != nil {
 		cfg.AuditURL = *fc.AuditURL
 	}
+	if fc.AccessTokenTTLMinutes != nil {
+		cfg.AccessTokenTTLMinutes = *fc.AccessTokenTTLMinutes
+	}
+	if fc.RefreshTokenTTLHours != nil {
+		cfg.RefreshTokenTTLHours = *fc.RefreshTokenTTLHours
+	}
 
 	return nil
 }
@@ -477,6 +510,12 @@ func applyExplicitServerFlags(dst *ConfigServer, src *ConfigServer, fs *flag.Fla
 	if fs.Changed("audit-url") {
 		dst.AuditURL = src.AuditURL
 	}
+	if fs.Changed("access-token-ttl-min") {
+		dst.AccessTokenTTLMinutes = src.AccessTokenTTLMinutes
+	}
+	if fs.Changed("refresh-token-ttl-hours") {
+		dst.RefreshTokenTTLHours = src.RefreshTokenTTLHours
+	}
 }
 
 // parseIntFromEnv парсит int-значение из переменной окружения и устанавливает его в поле конфигурации
@@ -539,6 +578,16 @@ func getDefaultAuditFile() string {
 // getDefaultAuditURL URL для отправки аудита по умолчанию
 func getDefaultAuditURL() string {
 	return ""
+}
+
+// getDefaultAccessTokenTTLMinutes срок жизни JWT access по умолчанию.
+func getDefaultAccessTokenTTLMinutes() int {
+	return 15
+}
+
+// getDefaultRefreshTokenTTLHours срок хранения refresh в БД по умолчанию.
+func getDefaultRefreshTokenTTLHours() int {
+	return 168
 }
 
 // findAvailableTCPPort возвращает первый свободный TCP-порт на host, начиная с first (включительно).

@@ -10,8 +10,8 @@ option go_package = "github.com/coolycow/gophkeeper/internal/proto/gophkeeperpb;
 
 // -----------------------------------------------------------------------------
 // Сервис: один вход для CLI и других клиентов.
-// Вызовы, кроме Register, Login, Ping, требуют метаданных авторизации
-// (например заголовок "authorization: Bearer <JWT>") — это настраивается в коде сервера, а не в .proto.
+// Вызовы, кроме Register, Login, Ping, RefreshToken, требуют метаданных авторизации
+// (например заголовок "authorization: Bearer <JWT access>") — JWT подписан HS256 на сервере.
 // -----------------------------------------------------------------------------
 
 service GophKeeperService {

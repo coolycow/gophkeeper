@@ -3,6 +3,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/coolycow/gophkeeper/internal/model"
 )
@@ -22,6 +23,11 @@ type GophKeeperRepository interface {
 	SoftDeleteUser(ctx context.Context, userID string) error               // мягко удаляет пользователя
 	HardDeleteUser(ctx context.Context, userID string) error               // полностью удаляет пользователя
 	GetUsersCount(ctx context.Context) int                                 // возвращает количество пользователей
+
+	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ REFRESH-ТОКЕНОВ //////////////////////////////////////////////////////////////
+	CreateRefreshToken(ctx context.Context, userID string, tokenHash []byte, expiresAt time.Time) (*model.RefreshToken, error) // создаёт запись refresh-токена
+	DeleteRefreshToken(ctx context.Context, id string) error                                                                   // удаляет запись (ротация / отзыв)
+	FindValidRefreshTokenByHash(ctx context.Context, tokenHash []byte, now time.Time) (*model.RefreshToken, error)             // находит неистёкшую запись по хэшу
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С СЕКРЕТАМИ //////////////////////////////////////////////////////////////
 	GetSecretByID(ctx context.Context, secretID string) (*model.Secret, error)                                   // получает секрет по его ID

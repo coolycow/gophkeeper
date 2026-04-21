@@ -38,6 +38,8 @@
 | `SALT_LENGTH` | Длина соли (параметры пользователя/пароля). |
 | `MIN_PASSWORD_LENGTH`, `MAX_PASSWORD_LENGTH` | Ограничения длины пароля. |
 | `AUDIT_FILE`, `AUDIT_URL` | Файл и URL для аудита. |
+| `ACCESS_TOKEN_TTL_MIN` | Срок жизни JWT access (минуты, 1–1440). |
+| `REFRESH_TOKEN_TTL_H` | Срок жизни refresh-токена в БД (часы, 1–8760). |
 
 ### Основные флаги
 
@@ -61,6 +63,8 @@
 | `--max-password-length` | макс. длина пароля | |
 | `-a`, `--audit-file` | файл аудита | |
 | `-b`, `--audit-url` | URL аудита | |
+| `--access-token-ttl-min` | JWT access (мин.) | По умолчанию 15. |
+| `--refresh-token-ttl-hours` | refresh в БД (ч.) | По умолчанию 168 (7 суток). |
 
 Путь к JSON и сами поля в файле используют **snake_case** (`host`, `database_dsn`, `grpc_port`, …). Ключ `config` внутри JSON для загрузки не используется — путь к файлу задаётся только `-c` / `CONFIG`.
 
@@ -95,7 +99,7 @@
 
 | Ключ | Значение |
 |------|----------|
-| `authorization` | Токен доступа в том виде, как его выдаёт сервер после `Register` / `Login` / `RefreshToken` (строка в hex). Допустим префикс `Bearer ` перед токеном. |
+| `authorization` | **JWT access** (строка), как после `Register` / `Login` / `RefreshToken`. Допустим префикс `Bearer `. **Refresh-токен** передаётся только в теле RPC `RefreshToken`, в metadata не кладётся. |
 
 В Insomnia: для запроса gRPC откройте раздел **Metadata** / **Headers** (в зависимости от версии) и добавьте пару `authorization` = ваш токен.
 
@@ -111,7 +115,7 @@
 | `RefreshToken` | `…/RefreshToken` | Нет | Обновление сессии; тело: `refresh_token`. |
 | `ListSecrets` | `…/ListSecrets` | Да | Список секретов; тело: `list_scope` — активные (`ACTIVE_ONLY` / по умолчанию), только корзина (`DELETED_ONLY`) или `ALL`. В `SecretSummary` для корзины заполнено `deleted_at`. |
 | `GetSecret` | `…/GetSecret` | Да | Один секрет; тело: `secret_id`, `include_version_history`. |
-| `CreateSecret` | `…/CreateSecret` | Да | Новый секрет; тело: `data_encrypted`, `data_format_version`, `kind`. |
+| `CreateSecret` | `…/CreateSecret` | Да | Новый секрет; тело: `data_encrypted`, `data_format_version`. |
 | `UpdateSecret` | `…/UpdateSecret` | Да | Новая версия; тело: `secret_id`, `data_encrypted`, `data_format_version`. |
 | `DeleteSecret` | `…/DeleteSecret` | Да | Удаление; тело: `secret_id`. |
 | `ListSecretVersions` | `…/ListSecretVersions` | Да | История версий; тело: `secret_id`. |

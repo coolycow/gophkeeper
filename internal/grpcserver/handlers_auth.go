@@ -2,10 +2,7 @@ package grpcserver
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"strings"
-	"time"
 
 	"github.com/coolycow/gophkeeper/internal/model"
 	"github.com/coolycow/gophkeeper/internal/observer/audit"
@@ -15,9 +12,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// sessionTokenTTL задаёт срок жизни, отражаемый в AuthResponse.expires_at (сами hex-токены пока без встроенного expiry).
-const sessionTokenTTL = 24 * time.Hour
-
 // Ping проверяет доступность gRPC-сервиса.
 func (s *Server) Ping(_ context.Context, _ *gophkeeperpb.PingRequest) (*gophkeeperpb.PingResponse, error) {
 	return &gophkeeperpb.PingResponse{Status: "ok"}, nil
@@ -25,38 +19,41 @@ func (s *Server) Ping(_ context.Context, _ *gophkeeperpb.PingRequest) (*gophkeep
 
 // Register создаёт пользователя и возвращает токены доступа.
 func (s *Server) Register(ctx context.Context, req *gophkeeperpb.RegisterRequest) (*gophkeeperpb.AuthResponse, error) {
-	// Пытаемся создать пользователя с переданными email и паролем.
+	// Создаём пользователя
 	user, err := s.userSvc.CreateUser(ctx, model.UserRegisterRequest{
 		Email:    req.GetEmail(),
 		Password: req.GetPassword(),
 	})
 
-	// Если ошибка, возвращаем ошибку.
+	// Если ошибка при создании пользователя, возвращаем ошибку
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
-	// Если пользователь успешно создан, возвращаем токены доступа.
-	resp, err := s.newAuthResponse(user)
+	resp, err := s.newAuthResponse(ctx, user)
 	if err != nil {
 		return nil, err
 	}
+
+	// Отправляем событие аудита
 	s.emitAudit(audit.ActionRegister, user.ID, "", "", "")
+
+	// Возвращаем токены доступа
 	return resp, nil
 }
 
 // Login выполняет вход по email и паролю.
 func (s *Server) Login(ctx context.Context, req *gophkeeperpb.LoginRequest) (*gophkeeperpb.AuthResponse, error) {
-	// Пытаемся получить пользователя по email и паролю.
+	// Получаем пользователя по email и паролю
 	user, err := s.userSvc.GetUserByEmailAndPassword(ctx, req.GetEmail(), req.GetPassword())
 
-	// Если ошибка, возвращаем ошибку.
+	// Если ошибка при получении пользователя, возвращаем ошибку
 	if err != nil {
 		return nil, grpcError(err)
 	}
 
-	// Если пользователь успешно найден, возвращаем токены доступа.
-	resp, err := s.newAuthResponse(user)
+	// Получаем токены доступа
+	resp, err := s.newAuthResponse(ctx, user)
 	if err != nil {
 		return nil, err
 	}
@@ -68,72 +65,49 @@ func (s *Server) Login(ctx context.Context, req *gophkeeperpb.LoginRequest) (*go
 	return resp, nil
 }
 
-// RefreshToken выдаёт новую пару токенов по ранее выданному refresh-токену (тот же формат hex, что и access).
+// RefreshToken выдаёт новую пару токенов по ранее выданному refresh-токену (хранится в БД по хэшу).
 func (s *Server) RefreshToken(ctx context.Context, req *gophkeeperpb.RefreshTokenRequest) (*gophkeeperpb.AuthResponse, error) {
-	// Пытаемся получить refresh-токен из запроса.
+	// Очищаем refresh-токен от пробелов
 	rt := strings.TrimSpace(req.GetRefreshToken())
+
+	// Если refresh-токен пустой, возвращаем ошибку
 	if rt == "" {
 		return nil, status.Error(codes.InvalidArgument, "refresh_token required")
 	}
 
-	// Пытаемся получить userID из refresh-токена.
-	userID, err := s.userSvc.GetUserIDFromAuthToken(rt)
+	// Обмениваем refresh-токен на новые токены
+	u, access, refresh, exp, err := s.userSvc.ExchangeRefreshToken(ctx, rt)
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "invalid refresh token")
-	}
-
-	// Пытаемся получить пользователя по userID.
-	u, err := s.userSvc.GetUserByID(ctx, userID)
-
-	// Если ошибка, возвращаем ошибку.
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, status.Error(codes.Unauthenticated, "user not found")
-		}
 		return nil, grpcError(err)
-	}
-
-	// Если пользователь не найден, возвращаем ошибку.
-	if u == nil {
-		return nil, status.Error(codes.Unauthenticated, "user not found")
-	}
-
-	// Если пользователь удален (мягкое удаление), возвращаем ошибку.
-	if u.DeletedAt != nil && !u.DeletedAt.IsZero() {
-		return nil, status.Error(codes.Unauthenticated, "user deleted")
-	}
-
-	// Если пользователь успешно найден, возвращаем токены доступа.
-	resp, err := s.newAuthResponse(u)
-	if err != nil {
-		return nil, err
 	}
 
 	// Отправляем событие аудита
 	s.emitAudit(audit.ActionRefreshToken, u.ID, "", "", "")
 
 	// Возвращаем токены доступа
-	return resp, nil
+	return &gophkeeperpb.AuthResponse{
+		Salt:         u.Salt,
+		Token:        access,
+		RefreshToken: refresh,
+		ExpiresAt:    timestamppb.New(exp),
+	}, nil
 }
 
-// newAuthResponse создаёт AuthResponse с токенами и сроком действия токенов.
-func (s *Server) newAuthResponse(u *model.User) (*gophkeeperpb.AuthResponse, error) {
-	// Пытаемся получить токены доступа и refresh-токен для пользователя.
-	tok, err := s.userSvc.GetCookieValueByUser(*u)
+// newAuthResponse создаёт AuthResponse: access — JWT, refresh — непрозрачная строка (в БД только хэш).
+func (s *Server) newAuthResponse(ctx context.Context, u *model.User) (*gophkeeperpb.AuthResponse, error) {
+	// Выдаём новые токены доступа
+	access, refresh, exp, err := s.userSvc.IssueAuthTokens(ctx, u)
 
-	// Если ошибка, возвращаем ошибку.
+	// Если ошибка при выдаче токенов, возвращаем ошибку
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "issue token: %v", err)
 	}
 
-	// Создаём срок действия токенов.
-	exp := timestamppb.New(time.Now().Add(sessionTokenTTL))
-
-	// Возвращаем токены доступа и refresh-токен.
+	// Возвращаем токены доступа
 	return &gophkeeperpb.AuthResponse{
 		Salt:         u.Salt,
-		Token:        tok,
-		RefreshToken: tok,
-		ExpiresAt:    exp,
+		Token:        access,
+		RefreshToken: refresh,
+		ExpiresAt:    timestamppb.New(exp),
 	}, nil
 }
