@@ -37,8 +37,8 @@ func (s *Server) ListSecrets(ctx context.Context, req *gophkeeperpb.ListSecretsR
 			CurrentSecretVersionId: sec.CurrentSecretVersionID,
 			UpdatedAt:              timestamppb.New(*sec.UpdatedAt),
 		}
-		if !sec.DeletedAt.IsZero() {
-			sum.DeletedAt = timestamppb.New(*sec.DeletedAt)
+		if sec.DeletedAt != nil && !sec.DeletedAt.IsZero() {
+			sum.DeletedAt = timeProtoPtr(sec.DeletedAt)
 		}
 		out = append(out, sum)
 	}
