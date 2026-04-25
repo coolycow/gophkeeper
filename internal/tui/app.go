@@ -58,11 +58,16 @@ type Model struct {
 
 	secrets          []*gophkeeperpb.SecretSummary // список секретов
 	secretListTitles []string                      // расшифрованные title (тот же порядок, что secrets)
+	secretListVers   []int32                       // номера текущих версий (тот же порядок, что secrets)
 	cursor           int                           // курсор на секрете
 
-	detailID      string              // ID секрета
-	detailPayload *clientdata.Payload // payload секрета
-	detailReveal  bool                // показать пароль и др. скрытые поля в просмотре
+	detailID               string              // ID секрета
+	detailPayload          *clientdata.Payload // payload секрета
+	detailReveal           bool                // показать пароль и др. скрытые поля в просмотре
+	detailCurrentVersionID string
+	detailVersions         []*gophkeeperpb.SecretVersion // список версий секрета
+	detailVersionTitles    []string                      // расшифрованные title версий
+	detailVersionCursor    int                           // курсор на версии секрета
 
 	createKind      clientdata.Kind   // тип секрета
 	createDraft     map[string]string // draft секрета
@@ -141,6 +146,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.v == viewDetail {
 				m.v = viewList
 				m.detailReveal = false
+				m.detailVersions = nil
+				m.detailVersionTitles = nil
+				m.detailVersionCursor = 0
 				m.errLine = ""
 				return m, nil
 			}
@@ -340,6 +348,7 @@ func (m *Model) reloadSecrets(ctx context.Context) error {
 		m.cursor = max(0, len(m.secrets)-1)
 	}
 	m.fillSecretListTitles()
+	m.fillSecretListVersions(ctx)
 
 	return nil
 }
@@ -384,6 +393,24 @@ func (m *Model) fillSecretListTitles() {
 		}
 
 		m.secretListTitles[i] = string(plain)
+	}
+}
+
+// fillSecretListVersions заполняет номера текущих версий по списку секретов.
+// Best-effort: при ошибке оставляет 0 для конкретной строки, не прерывая общий рендер списка.
+func (m *Model) fillSecretListVersions(ctx context.Context) {
+	m.secretListVers = nil
+	if m.api == nil || len(m.secrets) == 0 {
+		return
+	}
+	m.secretListVers = make([]int32, len(m.secrets))
+	for i, s := range m.secrets {
+		sec, err := m.api.GetSecret(ctx, s.GetId(), false)
+		if err != nil || sec == nil || sec.GetCurrentVersion() == nil {
+			m.secretListVers[i] = 0
+			continue
+		}
+		m.secretListVers[i] = sec.GetCurrentVersion().GetVersion()
 	}
 }
 
@@ -562,6 +589,18 @@ func (m *Model) deleteCurrent() (tea.Model, tea.Cmd) {
 
 // openDetail открывает детали секрета
 func (m *Model) openDetail(secretID string) (tea.Model, tea.Cmd) {
+	if err := m.reloadDetail(secretID, ""); err != nil {
+		m.errLine = fmt.Sprintf("Загрузка: %v", err)
+		return m, nil
+	}
+	m.detailReveal = false
+	m.v = viewDetail
+	m.errLine = ""
+	return m, nil
+}
+
+// reloadDetail перечитывает текущую версию секрета и список всех версий.
+func (m *Model) reloadDetail(secretID, preferredVersionID string) error {
 	// устанавливаем таймаут для запроса
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -569,45 +608,102 @@ func (m *Model) openDetail(secretID string) (tea.Model, tea.Cmd) {
 	// выполняем запрос на получение секрета
 	sec, err := m.api.GetSecret(ctx, secretID, false)
 	if err != nil {
-		m.errLine = fmt.Sprintf("Загрузка: %v", err)
-		return m, nil
+		return err
+	}
+
+	// получаем все версии секрета
+	versions, err := m.api.ListSecretVersions(ctx, secretID)
+	if err != nil {
+		return err
 	}
 
 	// получаем текущую версию секрета
 	cv := sec.GetCurrentVersion()
 	if cv == nil {
-		m.errLine = "Нет текущей версии"
-		return m, nil
+		return fmt.Errorf("нет текущей версии")
 	}
 
 	// получаем ключ для расшифровки данных
 	key, err := secretcrypto.DeriveKeyFromPassword(m.passwordSession, m.api.SaltHex())
 	if err != nil {
-		m.errLine = fmt.Sprintf("Ключ: %v", err)
-		return m, nil
+		return fmt.Errorf("ключ: %w", err)
 	}
+
 	// расшифровываем данные секрета
 	plain, err := secretcrypto.DecryptWithKey(cv.GetDataEncrypted(), key)
 	if err != nil {
-		m.errLine = fmt.Sprintf("Расшифровка: %v", err)
-		return m, nil
+		return fmt.Errorf("расшифровка: %w", err)
 	}
 
 	// десериализуем данные секрета
 	p, err := clientdata.UnmarshalJSONBytes(plain)
 	if err != nil {
-		m.errLine = fmt.Sprintf("Формат данных: %v", err)
-		return m, nil
+		return fmt.Errorf("формат данных: %w", err)
 	}
 
 	// сохраняем данные секрета
 	m.detailID = secretID
 	m.detailPayload = p
-	m.detailReveal = false
-	m.v = viewDetail
-	m.errLine = ""
+	m.detailCurrentVersionID = sec.GetCurrentSecretVersionId()
+	if m.detailCurrentVersionID == "" {
+		m.detailCurrentVersionID = cv.GetId()
+	}
+	m.detailVersions = versions
+	m.fillDetailVersionTitles(key)
+	m.pickDetailVersionCursor(preferredVersionID)
 
-	return m, nil
+	return nil
+}
+
+func (m *Model) fillDetailVersionTitles(key []byte) {
+	m.detailVersionTitles = make([]string, len(m.detailVersions))
+	for i, v := range m.detailVersions {
+		fallback := fmt.Sprintf("Версия %d", v.GetVersion())
+		if v.GetVersion() == 0 {
+			fallback = shortID(v.GetId())
+		}
+		te := v.GetTitleEncrypted()
+		if len(te) == 0 {
+			m.detailVersionTitles[i] = fallback
+			continue
+		}
+		plain, err := secretcrypto.DecryptWithKey(te, key)
+		if err != nil || len(plain) == 0 {
+			m.detailVersionTitles[i] = fallback
+			continue
+		}
+		m.detailVersionTitles[i] = string(plain)
+	}
+}
+
+func (m *Model) pickDetailVersionCursor(preferredVersionID string) {
+	if len(m.detailVersions) == 0 {
+		m.detailVersionCursor = 0
+		return
+	}
+	targetID := preferredVersionID
+	if targetID == "" {
+		targetID = m.detailCurrentVersionID
+	}
+	for i, v := range m.detailVersions {
+		if v.GetId() == targetID {
+			m.detailVersionCursor = i
+			return
+		}
+	}
+	if m.detailVersionCursor >= len(m.detailVersions) {
+		m.detailVersionCursor = len(m.detailVersions) - 1
+	}
+	if m.detailVersionCursor < 0 {
+		m.detailVersionCursor = 0
+	}
+}
+
+func (m *Model) selectedDetailVersion() *gophkeeperpb.SecretVersion {
+	if m.detailVersionCursor < 0 || m.detailVersionCursor >= len(m.detailVersions) {
+		return nil
+	}
+	return m.detailVersions[m.detailVersionCursor]
 }
 
 // updateDetail обновляет состояние при открытии деталей секрета
@@ -617,6 +713,22 @@ func (m *Model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch key.String() {
+	case "up", "k":
+		if m.detailVersionCursor > 0 {
+			m.detailVersionCursor--
+		}
+		return m, nil
+	case "down", "j":
+		if m.detailVersionCursor < len(m.detailVersions)-1 {
+			m.detailVersionCursor++
+		}
+		return m, nil
+	case "enter":
+		return m.restoreSelectedDetailVersion()
+	case "x", "X":
+		return m.deleteSelectedDetailVersion()
+	case "z", "Z":
+		return m.compressDetailSecret()
 	case "e", "E":
 		m.startCreateWizard(m.detailID)
 		return m, textinput.Blink
@@ -639,6 +751,95 @@ func (m *Model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+func (m *Model) restoreSelectedDetailVersion() (tea.Model, tea.Cmd) {
+	sv := m.selectedDetailVersion()
+	if sv == nil {
+		return m, nil
+	}
+	if sv.GetId() == m.detailCurrentVersionID {
+		m.info = "Эта версия уже текущая"
+		m.errLine = ""
+		return m, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := m.api.RestoreSecretVersion(ctx, m.detailID, sv.GetId()); err != nil {
+		m.errLine = fmt.Sprintf("Восстановление версии: %v", err)
+		return m, nil
+	}
+	if err := m.reloadDetail(m.detailID, sv.GetId()); err != nil {
+		m.errLine = fmt.Sprintf("Обновление деталей: %v", err)
+		return m, nil
+	}
+	if err := m.reloadSecrets(ctx); err != nil {
+		m.errLine = fmt.Sprintf("Обновление списка: %v", err)
+		return m, nil
+	}
+	m.errLine = ""
+	m.info = "Выбранная версия сделана текущей"
+	return m, nil
+}
+
+func (m *Model) deleteSelectedDetailVersion() (tea.Model, tea.Cmd) {
+	sv := m.selectedDetailVersion()
+	if sv == nil {
+		return m, nil
+	}
+	if len(m.detailVersions) <= 1 {
+		m.errLine = "Нельзя удалить единственную версию"
+		return m, nil
+	}
+	if sv.GetId() == m.detailCurrentVersionID {
+		m.errLine = "Нельзя удалить текущую версию. Сначала выберите другую и нажмите Enter"
+		return m, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := m.api.DeleteSecretVersion(ctx, m.detailID, sv.GetId()); err != nil {
+		m.errLine = fmt.Sprintf("Удаление версии: %v", err)
+		return m, nil
+	}
+	if err := m.reloadDetail(m.detailID, ""); err != nil {
+		m.errLine = fmt.Sprintf("Обновление деталей: %v", err)
+		return m, nil
+	}
+	m.errLine = ""
+	m.info = "Версия удалена"
+	return m, nil
+}
+
+func (m *Model) compressDetailSecret() (tea.Model, tea.Cmd) {
+	if len(m.detailVersions) <= 1 {
+		m.errLine = ""
+		m.info = "История уже сжата: осталась только текущая версия"
+		return m, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	deleted := 0
+	for _, v := range m.detailVersions {
+		if v.GetId() == m.detailCurrentVersionID {
+			continue
+		}
+		if err := m.api.DeleteSecretVersion(ctx, m.detailID, v.GetId()); err != nil {
+			m.errLine = fmt.Sprintf("Compress прерван после %d удалений: %v", deleted, err)
+			return m, nil
+		}
+		deleted++
+	}
+
+	if err := m.reloadDetail(m.detailID, m.detailCurrentVersionID); err != nil {
+		m.errLine = fmt.Sprintf("Обновление деталей: %v", err)
+		return m, nil
+	}
+	m.errLine = ""
+	m.info = fmt.Sprintf("История сжата, удалено версий: %d", deleted)
+	return m, nil
 }
 
 // resetCreateWizard сбрасывает состояние при создании секрета
@@ -972,23 +1173,44 @@ func (m *Model) View() string {
 		b.WriteString(hintStyle.Render("\nTab — поле, Enter — создать аккаунт, Esc — назад\n"))
 	// экран списка секретов
 	case viewList:
+		// Выводим заголовок списка секретов
 		b.WriteString("Секреты (активные)\n\n")
+
+		// Выводим список секретов
 		if len(m.secrets) == 0 {
 			b.WriteString("(пусто — нажмите n чтобы добавить)\n")
 		} else {
 			b.WriteString(renderSecretListTable(m))
 		}
+
+		// Выводим подсказки для экрана списка секретов
 		b.WriteString(hintStyle.Render("\nj/k — курсор, Enter — открыть, n — новый, d — удалить, r — обновить, q — в меню\n"))
 	// экран деталей секрета
 	case viewDetail:
+		// Выводим заголовок секрета
 		b.WriteString(fmt.Sprintf("Секрет %s\n\n", shortID(m.detailID)))
+
+		// Выводим payload секрета
 		if m.detailPayload != nil {
 			b.WriteString(renderPayload(m.detailPayload, m.detailReveal))
 		}
-		hints := "h — показать/скрыть скрытые данные, e — редактировать, Esc — к списку"
-		if m.detailPayload != nil && m.detailPayload.Kind == clientdata.KindLoginPair {
-			hints = "h — показать/скрыть скрытые данные, c — скопировать пароль, e — редактировать, Esc — к списку"
+
+		// Вывродим список версий секрета
+		b.WriteString("\nИСТОРИЯ ВЕРСИЙ СЕКРЕТА:\n\n")
+		if len(m.detailVersions) == 0 {
+			b.WriteString("(версии не найдены)\n")
+		} else {
+			b.WriteString(renderSecretVersionsTable(m))
 		}
+
+		// добавляем подсказки для экрана деталей секрета
+		hints := "j/k — выбор версии, Enter — сделать текущей, x — удалить версию, z — compress, h — показать/скрыть, e — редактировать, Esc — к списку"
+
+		// добавляем подсказки для экрана деталей секрета, если payload является логином/паролем
+		if m.detailPayload != nil && m.detailPayload.Kind == clientdata.KindLoginPair {
+			hints = "j/k — выбор версии, Enter — сделать текущей, x — удалить версию, z — compress, h — показать/скрыть, c — скопировать пароль, e — редактировать, Esc — к списку"
+		}
+
 		b.WriteString(hintStyle.Render("\n" + hints + "\n"))
 	// экран создания секрета
 	case viewCreate:
@@ -1022,16 +1244,18 @@ func (m *Model) View() string {
 }
 
 const (
-	listDateColW = 16 // "2006-01-02 15:04"
-	listColGapW  = 2  // зазор между столбцами
+	listDateColW    = 16   // "2006-01-02 15:04"
+	listVersionColW = 7    // "Версия"/номер
+	listColGapW     = 2    // зазор между столбцами
+	currMark        = "● " // маркер текущей версии
 )
 
 // listTableTitleWidth — ширина колонки «Название» в ячейках дисплея.
-func listTableTitleWidth(termW int) int {
+func listTableTitleWidth(termW int, fixedTail int) int {
 	if termW < 1 {
 		termW = 100
 	}
-	used := 2 + listDateColW + listColGapW + listDateColW + listColGapW
+	used := 2 + fixedTail
 	tw := termW - used
 	if tw < 14 {
 		tw = 14
@@ -1057,9 +1281,9 @@ func renderSecretListTable(m *Model) string {
 	if termW < 1 {
 		termW = 100
 	}
-	tw := listTableTitleWidth(termW)
+	tw := listTableTitleWidth(termW, listVersionColW+listColGapW+listDateColW+listColGapW+listDateColW+listColGapW)
 	gap := strings.Repeat(" ", listColGapW)
-	totalLineW := 2 + tw + listColGapW + listDateColW + listColGapW + listDateColW
+	totalLineW := 2 + tw + listColGapW + listVersionColW + listColGapW + listDateColW + listColGapW + listDateColW
 	sepW := totalLineW
 	if sepW > termW-1 {
 		sepW = termW - 1
@@ -1070,14 +1294,17 @@ func renderSecretListTable(m *Model) string {
 
 	var b strings.Builder
 	h1 := listHeaderStyle.Render(padListCell("Название", tw))
-	h2 := listHeaderStyle.Render(padListCell("Создан", listDateColW))
-	h3 := listHeaderStyle.Render(padListCell("Изменён", listDateColW))
+	h2 := listHeaderStyle.Render(padListCell("Версия", listVersionColW))
+	h3 := listHeaderStyle.Render(padListCell("Создан", listDateColW))
+	h4 := listHeaderStyle.Render(padListCell("Изменён", listDateColW))
 	b.WriteString("  ")
 	b.WriteString(h1)
 	b.WriteString(gap)
 	b.WriteString(h2)
 	b.WriteString(gap)
 	b.WriteString(h3)
+	b.WriteString(gap)
+	b.WriteString(h4)
 	b.WriteString("\n")
 	b.WriteString(listTableBorderStyle.Render(strings.Repeat("─", sepW)))
 	b.WriteString("\n")
@@ -1089,23 +1316,97 @@ func renderSecretListTable(m *Model) string {
 		}
 		created := formatTs(s.GetCreatedAt())
 		updated := formatTs(s.GetUpdatedAt())
+		ver := "?"
+		if i < len(m.secretListVers) && m.secretListVers[i] > 0 {
+			ver = fmt.Sprintf("%d", m.secretListVers[i])
+		}
 		pref := "  "
 		if i == m.cursor {
 			pref = "> "
 		}
 		tCell := padListCell(title, tw)
+		vCell := padListCell(ver, listVersionColW)
 		cCell := padListCell(created, listDateColW)
 		uCell := padListCell(updated, listDateColW)
-		line := tCell + gap + cCell + gap + uCell
+		line := tCell + gap + vCell + gap + cCell + gap + uCell
 		if i == m.cursor {
 			b.WriteString(listRowSelectedStyle.Render(pref+line) + "\n")
 		} else {
 			b.WriteString(pref)
 			b.WriteString(listTitleColStyle.Render(tCell))
 			b.WriteString(gap)
+			b.WriteString(listDateColStyle.Render(vCell))
+			b.WriteString(gap)
 			b.WriteString(listDateColStyle.Render(cCell))
 			b.WriteString(gap)
 			b.WriteString(listDateColStyle.Render(uCell))
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+// renderSecretVersionsTable рисует таблицу версий секрета.
+func renderSecretVersionsTable(m *Model) string {
+	termW := m.width
+	if termW < 1 {
+		termW = 100
+	}
+	tw := listTableTitleWidth(termW, listVersionColW+listColGapW+listDateColW+listColGapW)
+	gap := strings.Repeat(" ", listColGapW)
+	totalLineW := 2 + listVersionColW + listColGapW + tw + listColGapW + listDateColW
+	sepW := totalLineW
+	if sepW > termW-1 {
+		sepW = termW - 1
+	}
+	if sepW < 8 {
+		sepW = 8
+	}
+
+	var b strings.Builder
+	h1 := listHeaderStyle.Render(padListCell("Версия", listVersionColW))
+	h2 := listHeaderStyle.Render(padListCell("Заголовок", tw))
+	h3 := listHeaderStyle.Render(padListCell("Создана", listDateColW))
+	b.WriteString("  ")
+	b.WriteString(h1)
+	b.WriteString(gap)
+	b.WriteString(h2)
+	b.WriteString(gap)
+	b.WriteString(h3)
+	b.WriteString("\n")
+	b.WriteString(listTableBorderStyle.Render(strings.Repeat("─", sepW)))
+	b.WriteString("\n")
+
+	for i, v := range m.detailVersions {
+		title := shortID(v.GetId())
+		if i < len(m.detailVersionTitles) && m.detailVersionTitles[i] != "" {
+			title = m.detailVersionTitles[i]
+		}
+		if v.GetId() == m.detailCurrentVersionID {
+			title = currMark + title
+		}
+		ver := "?"
+		if v.GetVersion() > 0 {
+			ver = fmt.Sprintf("%d", v.GetVersion())
+		}
+		created := formatTs(v.GetCreatedAt())
+		pref := "  "
+		if i == m.detailVersionCursor {
+			pref = "> "
+		}
+		vCell := padListCell(ver, listVersionColW)
+		tCell := padListCell(title, tw)
+		cCell := padListCell(created, listDateColW)
+		line := vCell + gap + tCell + gap + cCell
+		if i == m.detailVersionCursor {
+			b.WriteString(listRowSelectedStyle.Render(pref+line) + "\n")
+		} else {
+			b.WriteString(pref)
+			b.WriteString(listDateColStyle.Render(vCell))
+			b.WriteString(gap)
+			b.WriteString(listTitleColStyle.Render(tCell))
+			b.WriteString(gap)
+			b.WriteString(listDateColStyle.Render(cCell))
 			b.WriteString("\n")
 		}
 	}

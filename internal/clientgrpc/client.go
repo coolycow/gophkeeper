@@ -304,6 +304,42 @@ func (c *Client) DeleteSecret(ctx context.Context, secretID string) error {
 	})
 }
 
+// ListSecretVersions возвращает все версии указанного секрета.
+func (c *Client) ListSecretVersions(ctx context.Context, secretID string) ([]*gophkeeperpb.SecretVersion, error) {
+	var out []*gophkeeperpb.SecretVersion
+	err := c.call(ctx, func(ctx context.Context) error {
+		resp, err := c.svc.ListSecretVersions(ctx, &gophkeeperpb.ListSecretVersionsRequest{SecretId: secretID})
+		if err != nil {
+			return err
+		}
+		out = resp.GetVersions()
+		return nil
+	})
+	return out, err
+}
+
+// RestoreSecretVersion делает выбранную версию текущей для секрета.
+func (c *Client) RestoreSecretVersion(ctx context.Context, secretID, secretVersionID string) error {
+	return c.call(ctx, func(ctx context.Context) error {
+		_, err := c.svc.RestoreSecretVersion(ctx, &gophkeeperpb.RestoreSecretVersionRequest{
+			SecretId:        secretID,
+			SecretVersionId: secretVersionID,
+		})
+		return err
+	})
+}
+
+// DeleteSecretVersion удаляет версию секрета.
+func (c *Client) DeleteSecretVersion(ctx context.Context, secretID, secretVersionID string) error {
+	return c.call(ctx, func(ctx context.Context) error {
+		_, err := c.svc.DeleteSecretVersion(ctx, &gophkeeperpb.DeleteSecretVersionRequest{
+			SecretId:        secretID,
+			SecretVersionId: secretVersionID,
+		})
+		return err
+	})
+}
+
 // NeedsRefreshSoon возвращает true, если access токен истекает в пределах margin (для проактивного обновления).
 func NeedsRefreshSoon(expiresAt time.Time, margin time.Duration, now time.Time) bool {
 	if expiresAt.IsZero() {

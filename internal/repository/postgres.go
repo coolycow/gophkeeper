@@ -609,7 +609,7 @@ func (r *PostgresRepository) GetAllSecretHistories(ctx context.Context, userID s
 	from secret_versions as sv
 	join secrets s on sv.secret_id = s.id
 	where s.user_id = $1
-	and sv.secret_id = $2`, userID, secretID)
+	and sv.secret_id = $2 order by sv.created_at desc`, userID, secretID)
 
 	// Ошибка получения всех версий секрета
 	if err != nil {
