@@ -36,6 +36,10 @@ func (s *Server) ListSecrets(ctx context.Context, req *gophkeeperpb.ListSecretsR
 			Id:                     sec.ID,
 			CurrentSecretVersionId: sec.CurrentSecretVersionID,
 			UpdatedAt:              timestamppb.New(*sec.UpdatedAt),
+			TitleEncrypted:         sec.ListTitleEncrypted,
+		}
+		if sec.CreatedAt != nil && !sec.CreatedAt.IsZero() {
+			sum.CreatedAt = timestamppb.New(*sec.CreatedAt)
 		}
 		if sec.DeletedAt != nil && !sec.DeletedAt.IsZero() {
 			sum.DeletedAt = timeProtoPtr(sec.DeletedAt)
@@ -112,6 +116,7 @@ func (s *Server) CreateSecret(ctx context.Context, req *gophkeeperpb.CreateSecre
 	// Создаём секрет
 	sec, err := s.secretSvc.CreateSecret(ctx, userID, model.SecretCreateRequest{
 		DataEncrypted:     req.GetDataEncrypted(),
+		TitleEncrypted:    req.GetTitleEncrypted(),
 		DataFormatVersion: int(req.GetDataFormatVersion()),
 	})
 
@@ -155,6 +160,7 @@ func (s *Server) UpdateSecret(ctx context.Context, req *gophkeeperpb.UpdateSecre
 	sv, err := s.secretVersionSvc.CreateSecretVersion(ctx, userID, req.GetSecretId(), &model.SecretVersion{
 		DataEncrypted:     req.GetDataEncrypted(),
 		DataFormatVersion: dfv,
+		TitleEncrypted:    req.GetTitleEncrypted(),
 	})
 
 	// Если ошибка при создании версии секрета, возвращаем ошибку

@@ -91,27 +91,29 @@ func openAESGCM(key, nonce, ciphertext []byte) ([]byte, error) {
 	return gcm.Open(nil, nonce, ciphertext, nil)
 }
 
-// Encrypt шифрует plaintext (AES-256-GCM), ключ — Argon2id от пароля и соли пользователя (hex).
-func Encrypt(plaintext []byte, password string, saltHex string) ([]byte, error) {
-	// Декодируем соль
+// DeriveKeyFromPassword возвращает 32-байтовый ключ AES (Argon2id); один вызов на пакет расшифровок
+// (список секретов) вместо Argon2 на каждый блоб.
+func DeriveKeyFromPassword(password, saltHex string) ([]byte, error) {
 	salt, err := decodeSalt(saltHex)
 	if err != nil {
 		return nil, err
 	}
-	key := deriveKey(password, salt)
+	return deriveKey(password, salt), nil
+}
 
-	// Генерируем nonce
+// EncryptWithKey шифрует plaintext тем же форматом, что и Encrypt, используя уже выведенный ключ.
+func EncryptWithKey(plaintext, key []byte) ([]byte, error) {
+	if len(key) != keyLen {
+		return nil, fmt.Errorf("secretcrypto: invalid key length %d, want %d", len(key), keyLen)
+	}
 	nonce := make([]byte, nonceLen)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, err
 	}
-
-	// Шифруем plaintext
 	sealed, err := sealAESGCM(key, nonce, plaintext)
 	if err != nil {
 		return nil, err
 	}
-
 	out := make([]byte, 0, magicLen+nonceLen+len(sealed))
 	out = append(out, []byte(magic)...)
 	out = append(out, nonce...)
@@ -119,35 +121,41 @@ func Encrypt(plaintext []byte, password string, saltHex string) ([]byte, error) 
 	return out, nil
 }
 
-// Decrypt расшифровывает блоб, полученный из Encrypt.
-func Decrypt(blob []byte, password string, saltHex string) ([]byte, error) {
-	// Проверяем, что длина blob не меньше magicLen+nonceLen
+// Encrypt шифрует plaintext (AES-256-GCM), ключ — Argon2id от пароля и соли пользователя (hex).
+func Encrypt(plaintext []byte, password string, saltHex string) ([]byte, error) {
+	key, err := DeriveKeyFromPassword(password, saltHex)
+	if err != nil {
+		return nil, err
+	}
+	return EncryptWithKey(plaintext, key)
+}
+
+// DecryptWithKey расшифровывает блоб, полученный из Encrypt/EncryptWithKey, используя тот же ключ.
+func DecryptWithKey(blob, key []byte) ([]byte, error) {
+	if len(key) != keyLen {
+		return nil, ErrDecrypt
+	}
 	if len(blob) < magicLen+nonceLen {
 		return nil, ErrDecrypt
 	}
-
-	// Проверяем, что magic число совпадает
 	if string(blob[:magicLen]) != magic {
 		return nil, ErrDecrypt
 	}
+	nonce := blob[magicLen : magicLen+nonceLen]
+	ct := blob[magicLen+nonceLen:]
+	plain, err := openAESGCM(key, nonce, ct)
+	if err != nil {
+		return nil, ErrDecrypt
+	}
+	return plain, nil
+}
 
-	// Декодируем соль
+// Decrypt расшифровывает блоб, полученный из Encrypt.
+func Decrypt(blob []byte, password string, saltHex string) ([]byte, error) {
 	salt, err := decodeSalt(saltHex)
 	if err != nil {
 		return nil, err
 	}
-
-	// Генерируем ключ
 	key := deriveKey(password, salt)
-	nonce := blob[magicLen : magicLen+nonceLen]
-	ct := blob[magicLen+nonceLen:]
-
-	// Расшифровываем ciphertext
-	plain, err := openAESGCM(key, nonce, ct)
-
-	if err != nil {
-		return nil, ErrDecrypt
-	}
-
-	return plain, nil
+	return DecryptWithKey(blob, key)
 }

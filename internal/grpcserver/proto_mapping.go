@@ -31,6 +31,7 @@ func protoSecretVersion(v *model.SecretVersion) *gophkeeperpb.SecretVersion {
 		CreatedAt:         timeProtoPtr(v.CreatedAt),
 		UpdatedAt:         timeProtoPtr(v.UpdatedAt),
 		DeletedAt:         timeProtoPtr(v.DeletedAt),
+		TitleEncrypted:    v.TitleEncrypted,
 	}
 }
 

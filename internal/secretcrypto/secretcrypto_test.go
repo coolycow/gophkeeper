@@ -48,3 +48,17 @@ func TestDecrypt_badMagic(t *testing.T) {
 func TestDataFormatVersion_constant(t *testing.T) {
 	require.Equal(t, 1, DataFormatVersion)
 }
+
+func TestDeriveKey_EncryptWithKey_roundTrip(t *testing.T) {
+	saltHex := "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+	password := "batch-decrypt"
+	plain := []byte("list title")
+	key, err := DeriveKeyFromPassword(password, saltHex)
+	require.NoError(t, err)
+	require.Len(t, key, 32)
+	ct, err := EncryptWithKey(plain, key)
+	require.NoError(t, err)
+	got, err := DecryptWithKey(ct, key)
+	require.NoError(t, err)
+	require.Equal(t, plain, got)
+}

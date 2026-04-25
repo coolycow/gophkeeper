@@ -87,6 +87,7 @@ func (s *secretService) CreateSecret(ctx context.Context, userID string, request
 				DataFormatVersion: dfv,
 				DataEncrypted:     data,
 				DataSize:          len(data),
+				TitleEncrypted:    request.TitleEncrypted,
 			},
 		},
 	}
@@ -117,7 +118,8 @@ func (s *secretService) UpdateSecret(ctx context.Context, userID string, secretI
 
 	// Обновляем секрет
 	secret.SecretVersions = append(secret.SecretVersions, &model.SecretVersion{
-		DataEncrypted: request.DataEncrypted,
+		DataEncrypted:  request.DataEncrypted,
+		TitleEncrypted: request.TitleEncrypted,
 	})
 
 	return s.repo.UpdateSecret(ctx, userID, secretID, secret)

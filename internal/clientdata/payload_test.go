@@ -1,6 +1,7 @@
 package clientdata
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -45,4 +46,19 @@ func TestPayload_Validate_binaryBadBase64(t *testing.T) {
 func TestUnmarshal_invalidJSON(t *testing.T) {
 	_, err := UnmarshalJSONBytes([]byte("{"))
 	require.Error(t, err)
+}
+
+func TestVersionListTitle_neverEmpty(t *testing.T) {
+	cases := []*Payload{
+		nil,
+		{Kind: KindLoginPair, Login: "a", Password: "b"},
+		{Kind: KindText, Text: "x"},
+		{Kind: KindBinary, BinaryBase64: "YQ=="},
+		{Kind: KindBankCard, CardNumber: "4", Expiry: "12/30"},
+	}
+	for _, p := range cases {
+		s := VersionListTitle(p)
+		require.NotEmpty(t, s)
+		require.NotEmpty(t, strings.TrimSpace(s))
+	}
 }

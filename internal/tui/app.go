@@ -55,8 +55,9 @@ type Model struct {
 
 	passwordSession string // пароль сессии
 
-	secrets []*gophkeeperpb.SecretSummary // список секретов
-	cursor  int                           // курсор на секрете
+	secrets          []*gophkeeperpb.SecretSummary // список секретов
+	secretListTitles []string                      // расшифрованные title (тот же порядок, что secrets)
+	cursor           int                           // курсор на секрете
 
 	detailID      string              // ID секрета
 	detailPayload *clientdata.Payload // payload секрета
@@ -329,13 +330,56 @@ func (m *Model) reloadSecrets(ctx context.Context) error {
 	if m.cursor >= len(m.secrets) {
 		m.cursor = max(0, len(m.secrets)-1)
 	}
+	m.fillSecretListTitles()
 
 	return nil
 }
 
+// fillSecretListTitles расшифровывает title_encrypted по списку (один Argon2 на весь пакет).
+func (m *Model) fillSecretListTitles() {
+	//``
+	m.secretListTitles = nil
+	if m.api == nil || len(m.secrets) == 0 || m.passwordSession == "" {
+		return
+	}
+
+	// получаем ключ для расшифровки данных
+	key, err := secretcrypto.DeriveKeyFromPassword(m.passwordSession, m.api.SaltHex())
+	if err != nil {
+		m.secretListTitles = make([]string, len(m.secrets))
+		for i, s := range m.secrets {
+			m.secretListTitles[i] = shortID(s.GetId())
+		}
+		return
+	}
+
+	// получаем ключ для расшифровки данных
+	m.secretListTitles = make([]string, len(m.secrets))
+	for i, s := range m.secrets {
+		// получаем зашифрованное название секрета
+		te := s.GetTitleEncrypted()
+
+		// проверяем, что зашифрованное название не пустое
+		if len(te) == 0 {
+			m.secretListTitles[i] = shortID(s.GetId())
+			continue
+		}
+
+		// расшифровываем название секрета
+		plain, err := secretcrypto.DecryptWithKey(te, key)
+
+		// проверяем, что расшифровка прошла успешно
+		if err != nil {
+			m.secretListTitles[i] = shortID(s.GetId())
+			continue
+		}
+
+		m.secretListTitles[i] = string(plain)
+	}
+}
+
 // updateRegister обновляет состояние при регистрации
 func (m *Model) updateRegister(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// проверяем, что соединение с сервером установлено
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "tab":
@@ -527,8 +571,14 @@ func (m *Model) openDetail(secretID string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// получаем ключ для расшифровки данных
+	key, err := secretcrypto.DeriveKeyFromPassword(m.passwordSession, m.api.SaltHex())
+	if err != nil {
+		m.errLine = fmt.Sprintf("Ключ: %v", err)
+		return m, nil
+	}
 	// расшифровываем данные секрета
-	plain, err := secretcrypto.Decrypt(cv.GetDataEncrypted(), m.passwordSession, m.api.SaltHex())
+	plain, err := secretcrypto.DecryptWithKey(cv.GetDataEncrypted(), key)
 	if err != nil {
 		m.errLine = fmt.Sprintf("Расшифровка: %v", err)
 		return m, nil
@@ -596,13 +646,13 @@ func (m *Model) resetCreateWizard() {
 func fieldKeysForKind(k clientdata.Kind) []string {
 	switch k {
 	case clientdata.KindLoginPair:
-		return []string{"meta", "title", "login", "password", "url"}
+		return []string{"title", "login", "password", "url", "meta"}
 	case clientdata.KindText:
-		return []string{"meta", "text"}
+		return []string{"title", "text", "meta"}
 	case clientdata.KindBinary:
-		return []string{"meta", "binary_base64"}
+		return []string{"title", "binary_base64", "meta"}
 	case clientdata.KindBankCard:
-		return []string{"meta", "card_holder", "card_number", "expiry", "cvc"}
+		return []string{"title", "card_holder", "card_number", "expiry", "cvc", "meta"}
 	default:
 		return nil
 	}
@@ -765,22 +815,25 @@ func (m *Model) prefillDraftFromPayload() {
 	if p == nil {
 		return
 	}
-	m.createDraft["meta"] = p.Meta
+	m.createDraft["title"] = p.Title
 	switch m.createKind {
 	case clientdata.KindLoginPair:
-		m.createDraft["title"] = p.Title
 		m.createDraft["login"] = p.Login
 		m.createDraft["password"] = p.Password
 		m.createDraft["url"] = p.URL
+		m.createDraft["meta"] = p.Meta
 	case clientdata.KindText:
 		m.createDraft["text"] = p.Text
+		m.createDraft["meta"] = p.Meta
 	case clientdata.KindBinary:
 		m.createDraft["binary_base64"] = p.BinaryBase64
+		m.createDraft["meta"] = p.Meta
 	case clientdata.KindBankCard:
 		m.createDraft["card_holder"] = p.CardHolder
 		m.createDraft["card_number"] = p.CardNumber
 		m.createDraft["expiry"] = p.Expiry
 		m.createDraft["cvc"] = p.CVC
+		m.createDraft["meta"] = p.Meta
 	}
 }
 
@@ -812,10 +865,31 @@ func (m *Model) finishCreate() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// получаем ключ для расшифровки данных
+	listTitle := clientdata.VersionListTitle(p)
+	key, err := secretcrypto.DeriveKeyFromPassword(m.passwordSession, m.api.SaltHex())
+	if err != nil {
+		m.errLine = fmt.Sprintf("Ключ: %v", err)
+		return m, nil
+	}
+
 	// шифруем данные секрета
-	ct, err := secretcrypto.Encrypt(raw, m.passwordSession, m.api.SaltHex())
+	ct, err := secretcrypto.EncryptWithKey(raw, key)
 	if err != nil {
 		m.errLine = fmt.Sprintf("Шифрование: %v", err)
+		return m, nil
+	}
+
+	// шифруем название секрета
+	titleCT, err := secretcrypto.EncryptWithKey([]byte(listTitle), key)
+	if err != nil {
+		m.errLine = fmt.Sprintf("Шифрование названия: %v", err)
+		return m, nil
+	}
+
+	// проверяем, что title_encrypted не пустой
+	if len(titleCT) == 0 {
+		m.errLine = "внутренняя ошибка: пустой title_encrypted"
 		return m, nil
 	}
 
@@ -825,10 +899,12 @@ func (m *Model) finishCreate() (tea.Model, tea.Cmd) {
 
 	// выполняем запрос на создание или обновление секрета
 	if m.editingSecretID != "" {
-		_, err = m.api.UpdateSecret(ctx, m.editingSecretID, ct, int32(secretcrypto.DataFormatVersion))
+		_, err = m.api.UpdateSecret(ctx, m.editingSecretID, ct, titleCT, int32(secretcrypto.DataFormatVersion))
 	} else {
-		_, err = m.api.CreateSecret(ctx, ct, int32(secretcrypto.DataFormatVersion))
+		_, err = m.api.CreateSecret(ctx, ct, titleCT, int32(secretcrypto.DataFormatVersion))
 	}
+
+	// проверяем, что запрос выполнен успешно
 	if err != nil {
 		m.errLine = fmt.Sprintf("Отправка: %v", err)
 		return m, nil
@@ -880,7 +956,14 @@ func (m *Model) View() string {
 			b.WriteString("(пусто — нажмите n чтобы добавить)\n")
 		}
 		for i, s := range m.secrets {
-			line := fmt.Sprintf("%s  %s  ver…%s", shortID(s.GetId()), formatTs(s.GetUpdatedAt()), shortID(s.GetCurrentSecretVersionId()))
+			// получаем название секрета
+			title := shortID(s.GetId())
+			if i < len(m.secretListTitles) && m.secretListTitles[i] != "" {
+				title = m.secretListTitles[i]
+			}
+
+			// форматируем строку для вывода
+			line := fmt.Sprintf("%s  созд.: %s  изм.: %s", trimMiddle(title, 40), formatTs(s.GetCreatedAt()), formatTs(s.GetUpdatedAt()))
 			if i == m.cursor {
 				b.WriteString("> " + line + "\n")
 			} else {
@@ -935,10 +1018,7 @@ func renderPayload(p *clientdata.Payload, reveal bool) string {
 	// создаем билдер для сборки строки
 	var b strings.Builder
 
-	// добавляем метаданные, если они есть
-	if p.Meta != "" {
-		fmt.Fprintf(&b, "Метаданные: %s\n", p.Meta)
-	}
+	fmt.Fprintf(&b, "Заголовок: %s\n", p.Title)
 
 	switch p.Kind {
 	// тип логин/пароль
@@ -947,7 +1027,7 @@ func renderPayload(p *clientdata.Payload, reveal bool) string {
 		if reveal {
 			pw = p.Password
 		}
-		fmt.Fprintf(&b, "Тип: логин/пароль\nЗаголовок: %s\nЛогин: %s\nПароль: %s\nURL: %s\n", p.Title, p.Login, pw, p.URL)
+		fmt.Fprintf(&b, "Тип: логин/пароль\nЛогин: %s\nПароль: %s\nURL: %s\n", p.Login, pw, p.URL)
 	// тип текст
 	case clientdata.KindText:
 		fmt.Fprintf(&b, "Тип: текст\n%s\n", p.Text)
@@ -958,6 +1038,12 @@ func renderPayload(p *clientdata.Payload, reveal bool) string {
 	case clientdata.KindBankCard:
 		fmt.Fprintf(&b, "Тип: банковская карта\nДержатель: %s\nНомер: %s\nСрок: %s\n", p.CardHolder, trimMiddle(p.CardNumber, 8), p.Expiry)
 	}
+
+	// добавляем метаданные, если они есть
+	if p.Meta != "" {
+		fmt.Fprintf(&b, "Метаданные: %s\n", p.Meta)
+	}
+
 	return b.String()
 }
 

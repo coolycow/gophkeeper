@@ -22,6 +22,9 @@ CREATE TABLE secret_versions (
     -- гарантируется обратная совместимость с предыдущими версиями формата данных
     data_format_version SMALLINT NOT NULL DEFAULT 1 CHECK (data_format_version >= 1),
 
+    -- зашифрованное название записи в списке
+    title_encrypted BYTEA NOT NULL,
+
     -- зашифрованные данные записи, расшифровать может только клиент
     -- внутри зашифрованные данные хранятся в формате JSON, который содержит структуру соответствующую версии формата данных
     data_encrypted BYTEA NOT NULL,

@@ -260,11 +260,12 @@ func (c *Client) GetSecret(ctx context.Context, secretID string, withHistory boo
 }
 
 // CreateSecret отправляет первую зашифрованную версию.
-func (c *Client) CreateSecret(ctx context.Context, dataEncrypted []byte, dataFormatVersion int32) (*gophkeeperpb.Secret, error) {
+func (c *Client) CreateSecret(ctx context.Context, dataEncrypted, titleEncrypted []byte, dataFormatVersion int32) (*gophkeeperpb.Secret, error) {
 	var out *gophkeeperpb.Secret
 	err := c.call(ctx, func(ctx context.Context) error {
 		resp, err := c.svc.CreateSecret(ctx, &gophkeeperpb.CreateSecretRequest{
 			DataEncrypted:     dataEncrypted,
+			TitleEncrypted:    titleEncrypted,
 			DataFormatVersion: dataFormatVersion,
 		})
 		if err != nil {
@@ -277,12 +278,13 @@ func (c *Client) CreateSecret(ctx context.Context, dataEncrypted []byte, dataFor
 }
 
 // UpdateSecret отправляет новую зашифрованную версию.
-func (c *Client) UpdateSecret(ctx context.Context, secretID string, dataEncrypted []byte, dataFormatVersion int32) (*gophkeeperpb.SecretVersion, error) {
+func (c *Client) UpdateSecret(ctx context.Context, secretID string, dataEncrypted, titleEncrypted []byte, dataFormatVersion int32) (*gophkeeperpb.SecretVersion, error) {
 	var out *gophkeeperpb.SecretVersion
 	err := c.call(ctx, func(ctx context.Context) error {
 		resp, err := c.svc.UpdateSecret(ctx, &gophkeeperpb.UpdateSecretRequest{
 			SecretId:          secretID,
 			DataEncrypted:     dataEncrypted,
+			TitleEncrypted:    titleEncrypted,
 			DataFormatVersion: dataFormatVersion,
 		})
 		if err != nil {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Kind идентифицирует, какие поля имеют смысл в Payload.
@@ -100,4 +101,48 @@ func (p *Payload) BinaryBytes() ([]byte, error) {
 func (p *Payload) SetBinary(b []byte) {
 	p.Kind = KindBinary
 	p.BinaryBase64 = base64.StdEncoding.EncodeToString(b)
+}
+
+// VersionListTitle — строка, которую клиент шифрует в title_encrypted версии (одинаковая логика для всех Kind).
+// Всегда непустая (после trim), чтобы согласоваться с NOT NULL title_encrypted в БД и не шифровать пустой UTF-8.
+func VersionListTitle(p *Payload) string {
+	var s string
+	if p == nil {
+		s = "секрет"
+	} else {
+		switch p.Kind {
+		case KindLoginPair:
+			if t := strings.TrimSpace(p.Title); t != "" {
+				s = t
+			} else if t := strings.TrimSpace(p.Meta); t != "" {
+				s = t
+			} else {
+				s = "логин/пароль"
+			}
+		case KindText:
+			if t := strings.TrimSpace(p.Meta); t != "" {
+				s = t
+			} else {
+				s = "текст"
+			}
+		case KindBinary:
+			if t := strings.TrimSpace(p.Meta); t != "" {
+				s = t
+			} else {
+				s = "бинарные данные"
+			}
+		case KindBankCard:
+			if t := strings.TrimSpace(p.Meta); t != "" {
+				s = t
+			} else {
+				s = "банковская карта"
+			}
+		default:
+			s = "секрет"
+		}
+	}
+	if strings.TrimSpace(s) == "" {
+		return "секрет"
+	}
+	return s
 }

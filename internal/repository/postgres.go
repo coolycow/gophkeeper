@@ -293,19 +293,22 @@ func (r *PostgresRepository) GetSecretByID(ctx context.Context, secretID string)
 
 // GetSecretsByUserID получает секреты пользователя: активные (deleted_at IS NULL), корзину (мягко удалённые) или все.
 func (r *PostgresRepository) GetSecretsByUserID(ctx context.Context, userID string, scope model.SecretListScope) ([]*model.Secret, error) {
-	// Строим запрос в зависимости от scope
-	q := "select id, user_id, current_secret_version_id, created_at, updated_at, deleted_at from secrets where user_id = $1"
+	// title_encrypted — у текущей версии (для списка на клиенте).
+	q := `select s.id, s.user_id, s.current_secret_version_id, s.created_at, s.updated_at, s.deleted_at, sv.title_encrypted
+from secrets s
+left join secret_versions sv on sv.id = s.current_secret_version_id
+where s.user_id = $1`
 
 	// Добавляем фильтр в зависимости от scope
 	switch scope {
 	case model.SecretListScopeActiveOnly, model.SecretListScopeUnspecified:
-		q += " and deleted_at is null"
+		q += " and s.deleted_at is null"
 	case model.SecretListScopeDeletedOnly:
-		q += " and deleted_at is not null"
+		q += " and s.deleted_at is not null"
 	case model.SecretListScopeAll:
 		// без фильтра по deleted_at
 	default:
-		q += " and deleted_at is null"
+		q += " and s.deleted_at is null"
 	}
 
 	// Выполняем запрос
@@ -321,13 +324,19 @@ func (r *PostgresRepository) GetSecretsByUserID(ctx context.Context, userID stri
 	for rows.Next() {
 		var secret model.Secret
 		var currentVersionID sql.NullString
-		err := rows.Scan(&secret.ID, &secret.UserID, &currentVersionID, &secret.CreatedAt, &secret.UpdatedAt, &secret.DeletedAt)
+		var titleEnc []byte
+		err := rows.Scan(&secret.ID, &secret.UserID, &currentVersionID, 
+			&secret.CreatedAt, &secret.UpdatedAt, &secret.DeletedAt, &titleEnc)
+		
 		if err != nil {
 			return nil, err
 		}
+
 		if currentVersionID.Valid {
 			secret.CurrentSecretVersionID = currentVersionID.String
 		}
+
+		secret.ListTitleEncrypted = titleEnc
 		secrets = append(secrets, &secret)
 	}
 
@@ -340,11 +349,16 @@ func (r *PostgresRepository) GetSecretsByUserID(ctx context.Context, userID stri
 
 // GetSecretByUserIDAndSecretID получает секрет по его ID и ID пользователя
 func (r *PostgresRepository) GetSecretByUserIDAndSecretID(ctx context.Context, userID string, secretID string) (*model.Secret, error) {
-	row := r.db.QueryRowContext(ctx, "select id, user_id, current_secret_version_id, created_at, updated_at, deleted_at from secrets where user_id = $1 and id = $2", userID, secretID)
+	row := r.db.QueryRowContext(ctx, `select s.id, s.user_id, s.current_secret_version_id,
+	s.created_at, s.updated_at, s.deleted_at, sv.title_encrypted from secrets s
+	join secret_versions sv on sv.id = s.current_secret_version_id
+	where s.user_id = $1 and s.id = $2`, userID, secretID)
 
 	var secret model.Secret
+
 	var currentVersionID sql.NullString
-	err := row.Scan(&secret.ID, &secret.UserID, &currentVersionID, &secret.CreatedAt, &secret.UpdatedAt, &secret.DeletedAt)
+	var titleEnc []byte
+	err := row.Scan(&secret.ID, &secret.UserID, &currentVersionID, &secret.CreatedAt, &secret.UpdatedAt, &secret.DeletedAt, &titleEnc)
 
 	if err != nil {
 		return nil, err
@@ -353,6 +367,7 @@ func (r *PostgresRepository) GetSecretByUserIDAndSecretID(ctx context.Context, u
 	if currentVersionID.Valid {
 		secret.CurrentSecretVersionID = currentVersionID.String
 	}
+	secret.ListTitleEncrypted = titleEnc
 
 	return &secret, nil
 }
@@ -379,12 +394,13 @@ func (r *PostgresRepository) CreateSecret(ctx context.Context, userID string, se
 
 	// 2. Первая версия (version = 1).
 	rowSecretVersion := tx.QueryRowContext(ctx,
-		`insert into secret_versions (secret_id, version, data_format_version, data_encrypted, data_size)
-		values ($1, 1, $2, $3, $4) returning id, secret_id, version, data_format_version, data_encrypted, data_size, created_at`,
+		`insert into secret_versions (secret_id, version, data_format_version, data_encrypted, data_size, title_encrypted)
+		values ($1, 1, $2, $3, $4, $5) returning id, secret_id, version, data_format_version, data_encrypted, data_size, created_at`,
 		newSecret.ID,
 		secret.SecretVersions[0].DataFormatVersion,
 		secret.SecretVersions[0].DataEncrypted,
-		secret.SecretVersions[0].DataSize)
+		secret.SecretVersions[0].DataSize,
+		secret.SecretVersions[0].TitleEncrypted)
 
 	var newSecretVersion model.SecretVersion
 	err = rowSecretVersion.Scan(
@@ -395,6 +411,7 @@ func (r *PostgresRepository) CreateSecret(ctx context.Context, userID string, se
 		_ = tx.Rollback()
 		return nil, err
 	}
+	newSecretVersion.TitleEncrypted = secret.SecretVersions[0].TitleEncrypted
 
 	// 3. Привязка текущей версии (удовлетворяет FK fk_secrets_current_version_id).
 	err = tx.QueryRowContext(ctx,
@@ -423,8 +440,9 @@ func (r *PostgresRepository) CreateSecret(ctx context.Context, userID string, se
 
 // UpdateSecret обновляет секрет (TODO: доработать, т.к. фактически это неправильное обновление)
 func (r *PostgresRepository) UpdateSecret(ctx context.Context, userID string, secretID string, secret *model.Secret) error {
-	row := r.db.QueryRowContext(ctx, `update secrets set current_secret_version_id = $1, updated_at = $2, deleted_at = $3 where user_id = $4 and id = $5
-		returning id, user_id, current_secret_version_id, created_at, updated_at, deleted_at`,
+	row := r.db.QueryRowContext(ctx, `update secrets set current_secret_version_id = $1, updated_at = $2, 
+	deleted_at = $3 where user_id = $4 and id = $5
+	returning id, user_id, current_secret_version_id, created_at, updated_at, deleted_at`,
 		secret.CurrentSecretVersionID, secret.UpdatedAt, secret.DeletedAt, userID, secretID)
 
 	var currentVersionID sql.NullString
@@ -514,14 +532,17 @@ func (r *PostgresRepository) GetMaxSecretVersion(ctx context.Context, userID str
 
 // GetCurrentSecretVersion получает актуальную версию секрета
 func (r *PostgresRepository) GetCurrentSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error) {
-	// Получаем актуальную версию секрета по ID пользователя и ID секрета
-	row := r.db.QueryRowContext(ctx, `select id, secret_id, version, data_format_version, data_encrypted, data_size, created_at 
-	from secret_versions where secret_id = $1 
-	and secret_id in (select id from secrets where user_id = $2)`, secretID, userID)
+	row := r.db.QueryRowContext(ctx, `select sv.id, sv.secret_id, sv.version, sv.data_format_version, 
+	sv.data_encrypted, sv.data_size, sv.created_at, sv.title_encrypted
+	from secret_versions sv
+	inner join secrets s on s.id = sv.secret_id and s.current_secret_version_id = sv.id
+	where s.user_id = $1 and s.id = $2`, userID, secretID)
 
 	// Получаем версию секрета
 	var secretVersion model.SecretVersion
-	err := row.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version, &secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize, &secretVersion.CreatedAt)
+	err := row.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version,
+		&secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize,
+		&secretVersion.CreatedAt, &secretVersion.TitleEncrypted)
 
 	// Ошибка получения актуальной версии секрета
 	if err != nil {
@@ -535,7 +556,7 @@ func (r *PostgresRepository) GetCurrentSecretVersion(ctx context.Context, userID
 func (r *PostgresRepository) GetLatestSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error) {
 	// Получаем последнюю версию секрета по ID пользователя и ID секрета
 	row := r.db.QueryRowContext(ctx, `select sv.id, sv.secret_id, sv.version, 
-	sv.data_format_version, sv.data_encrypted, sv.data_size, sv.created_at
+	sv.data_format_version, sv.data_encrypted, sv.data_size, sv.created_at, sv.title_encrypted
 	from secret_versions as sv
 	join secrets s on sv.secret_id = s.id
 	where s.user_id = $1
@@ -544,7 +565,8 @@ func (r *PostgresRepository) GetLatestSecretVersion(ctx context.Context, userID 
 
 	var secretVersion model.SecretVersion
 	err := row.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version,
-		&secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize, &secretVersion.CreatedAt)
+		&secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize,
+		&secretVersion.CreatedAt, &secretVersion.TitleEncrypted)
 
 	if err != nil {
 		return nil, err
@@ -557,7 +579,7 @@ func (r *PostgresRepository) GetLatestSecretVersion(ctx context.Context, userID 
 func (r *PostgresRepository) GetSecretVersionByID(ctx context.Context, userID string, secretID string, secretVersionID string) (*model.SecretVersion, error) {
 	// Получаем версию секрета по ID пользователя, ID секрета и ID версии секрета
 	row := r.db.QueryRowContext(ctx, `select sv.id, sv.secret_id, sv.version, 
-	sv.data_format_version, sv.data_encrypted, sv.data_size, sv.created_at
+	sv.data_format_version, sv.data_encrypted, sv.data_size, sv.created_at, sv.title_encrypted
 	from secret_versions as sv
 	join secrets s on sv.secret_id = s.id
 	where s.user_id = $1
@@ -566,7 +588,8 @@ func (r *PostgresRepository) GetSecretVersionByID(ctx context.Context, userID st
 
 	var secretVersion model.SecretVersion
 	err := row.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version,
-		&secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize, &secretVersion.CreatedAt)
+		&secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize,
+		&secretVersion.CreatedAt, &secretVersion.TitleEncrypted)
 
 	if err != nil {
 		return nil, err
@@ -579,7 +602,7 @@ func (r *PostgresRepository) GetSecretVersionByID(ctx context.Context, userID st
 func (r *PostgresRepository) GetAllSecretHistories(ctx context.Context, userID string, secretID string) ([]*model.SecretVersion, error) {
 	// Получаем все версии секрета по ID пользователя и ID секрета
 	rows, err := r.db.QueryContext(ctx, `select sv.id, sv.secret_id, sv.version, 
-	sv.data_format_version, sv.data_encrypted, sv.data_size, sv.created_at
+	sv.data_format_version, sv.data_encrypted, sv.data_size, sv.created_at, sv.title_encrypted
 	from secret_versions as sv
 	join secrets s on sv.secret_id = s.id
 	where s.user_id = $1
@@ -599,8 +622,9 @@ func (r *PostgresRepository) GetAllSecretHistories(ctx context.Context, userID s
 	// Цикл по строкам
 	for rows.Next() {
 		var secretVersion model.SecretVersion
-		err := rows.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version, &secretVersion.DataFormatVersion,
-			&secretVersion.DataEncrypted, &secretVersion.DataSize, &secretVersion.CreatedAt)
+		err := rows.Scan(&secretVersion.ID, &secretVersion.SecretID, &secretVersion.Version,
+			&secretVersion.DataFormatVersion, &secretVersion.DataEncrypted, &secretVersion.DataSize,
+			&secretVersion.CreatedAt, &secretVersion.TitleEncrypted)
 
 		if err != nil {
 			return nil, err
@@ -653,23 +677,27 @@ func (r *PostgresRepository) CreateSecretVersion(ctx context.Context, userID str
 	secretVersion.Version = maxVersion + 1
 
 	// Создаем версию секрета по ID пользователя, ID секрета и версии секрета
-	row = tx.QueryRowContext(ctx, `insert into secret_versions (secret_id, version, data_format_version, data_encrypted, data_size) 
-	values ($1, $2, $3, $4, $5) returning id, secret_id, version, data_format_version, data_encrypted, data_size, created_at`,
-		secretID, secretVersion.Version, secretVersion.DataFormatVersion, secretVersion.DataEncrypted, secretVersion.DataSize)
+	row = tx.QueryRowContext(ctx, `insert into secret_versions 
+	(secret_id, version, data_format_version, data_encrypted, data_size, title_encrypted) 
+	values ($1, $2, $3, $4, $5, $6) 
+	returning id, secret_id, version, data_format_version, data_encrypted, data_size, created_at`,
+		secretID, secretVersion.Version, secretVersion.DataFormatVersion, secretVersion.DataEncrypted, secretVersion.DataSize, secretVersion.TitleEncrypted)
 
 	// Получаем версию секрета
 	var newSecretVersion model.SecretVersion
 	err = row.Scan(&newSecretVersion.ID, &newSecretVersion.SecretID, &newSecretVersion.Version, &newSecretVersion.DataFormatVersion,
 		&newSecretVersion.DataEncrypted, &newSecretVersion.DataSize, &newSecretVersion.CreatedAt)
-
-	// Ошибка создания версии секрета
 	if err != nil {
 		_ = tx.Rollback()
 		return nil, err
 	}
+	newSecretVersion.TitleEncrypted = secretVersion.TitleEncrypted
 
 	// Привязываем версию секрета к секрету как текущую версию
-	_, err = tx.ExecContext(ctx, "update secrets set current_secret_version_id = $1 where user_id = $2 and id = $3", newSecretVersion.ID, userID, secretID)
+	_, err = tx.ExecContext(ctx, `update secrets 
+	set current_secret_version_id = $1, updated_at = NOW() 
+	where user_id = $2 and id = $3`, newSecretVersion.ID, userID, secretID)
+
 	if err != nil {
 		_ = tx.Rollback()
 		return nil, err
@@ -709,7 +737,9 @@ func (r *PostgresRepository) HardDeleteSecretVersion(ctx context.Context, userID
 // Если у секрета всего одна версия, то удаляем её и по сути секрет становится пустым.
 func (r *PostgresRepository) HardDeleteOldestSecretVersion(ctx context.Context, userID string, secretID string) error {
 	// Получаем количество версий секрета
-	row := r.db.QueryRowContext(ctx, "select count(*) from secret_versions where secret_id = $1 and secret_id in (select id from secrets where user_id = $2)", secretID, userID)
+	row := r.db.QueryRowContext(ctx, `select count(*) from secret_versions sv
+	join secrets s on sv.secret_id = s.id
+	where s.user_id = $1 and sv.secret_id = $2`, userID, secretID)
 
 	var count int
 	err := row.Scan(&count)
@@ -720,7 +750,11 @@ func (r *PostgresRepository) HardDeleteOldestSecretVersion(ctx context.Context, 
 
 	// Если количество версий секрета равно 1, то удаляем её и по сути секрет становится пустым
 	if count == 1 {
-		_, err := r.db.ExecContext(ctx, "delete from secret_versions where secret_id = $1 and secret_id in (select id from secrets where user_id = $2)", secretID, userID)
+		_, err := r.db.ExecContext(ctx, `delete from secret_versions sv
+		using secrets s
+		where sv.secret_id = s.id
+		  and s.user_id = $1
+		  and sv.secret_id = $2`, secretID, userID)
 
 		if err != nil {
 			return err
@@ -747,7 +781,9 @@ func (r *PostgresRepository) HardDeleteOldestSecretVersion(ctx context.Context, 
 
 // RestoreSecretVersion восстанавливает версию секрета (делает её текущей для секрета)
 func (r *PostgresRepository) RestoreSecretVersion(ctx context.Context, userID string, secretID string, secretVersionID string) error {
-	_, err := r.db.ExecContext(ctx, "update secrets set current_secret_version_id = $1 where user_id = $2 and id = $3", secretVersionID, userID, secretID)
+	_, err := r.db.ExecContext(ctx, `update secrets 
+	set current_secret_version_id = $1, updated_at = NOW() 
+	where user_id = $2 and id = $3`, secretVersionID, userID, secretID)
 
 	if err != nil {
 		return err
@@ -862,8 +898,11 @@ func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context
 
 // CreateAttachment создает вложение
 func (r *PostgresRepository) CreateAttachment(ctx context.Context, userID string, secretVersionID string, attachment *model.Attachment) (*model.Attachment, error) {
-	row := r.db.QueryRowContext(ctx, `insert into attachments (secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_encrypted, data_size)
-	values ($1, $2, $3, $4, $5, $6, $7) returning id, secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_encrypted, data_size, created_at`,
+	row := r.db.QueryRowContext(ctx, `insert into attachments 
+	(secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_encrypted, data_size)
+	values ($1, $2, $3, $4, $5, $6, $7) 
+	returning id, secret_version_id, data_format_version, info_format_version, info_encrypted, 
+	info_size, data_encrypted, data_size, created_at`,
 		secretVersionID, attachment.DataFormatVersion, attachment.InfoFormatVersion, attachment.InfoEncrypted, attachment.InfoSize, attachment.DataEncrypted, attachment.DataSize)
 
 	var newAttachment model.Attachment
@@ -882,7 +921,8 @@ func (r *PostgresRepository) CreateAttachment(ctx context.Context, userID string
 func (r *PostgresRepository) HardDeleteAttachment(ctx context.Context, userID string, attachmentID string) error {
 	_, err := r.db.ExecContext(ctx, `delete from attachments 
 	where id = $1 
-	and secret_version_id in (select id from secret_versions where secret_id in (select id from secrets where user_id = $2))`, attachmentID, userID)
+	and secret_version_id in 
+	(select id from secret_versions where secret_id in (select id from secrets where user_id = $2))`, attachmentID, userID)
 
 	// Ошибка удаления вложения
 	if err != nil {

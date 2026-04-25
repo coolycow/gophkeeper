@@ -138,6 +138,10 @@ message SecretSummary {
   google.protobuf.Timestamp updated_at = 3;
   // Для записей в корзине (мягкое удаление); для активных не задаётся.
   google.protobuf.Timestamp deleted_at = 4;
+  // Название (ciphertext, тот же алгоритм, что data_encrypted); пусто для старых данных.
+  bytes title_encrypted = 5;
+  // Время создания записи секрета.
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message ListSecretsRequest {
@@ -175,17 +179,21 @@ message SecretVersion {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   google.protobuf.Timestamp deleted_at = 9;
+  // Название в списке (ciphertext); пусто для старых версий.
+  bytes title_encrypted = 10;
 }
 
 message CreateSecretRequest {
   bytes data_encrypted = 1;
   int32 data_format_version = 2;
+  bytes title_encrypted = 3;
 }
 
 message UpdateSecretRequest {
   string secret_id = 1;
   bytes data_encrypted = 2;
   int32 data_format_version = 3;
+  bytes title_encrypted = 4;
 }
 
 message DeleteSecretRequest {
