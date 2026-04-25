@@ -311,6 +311,9 @@ where s.user_id = $1`
 		q += " and s.deleted_at is null"
 	}
 
+	// Добавляем сортировку по created_at
+	q += " order by s.created_at asc"
+
 	// Выполняем запрос
 	rows, err := r.db.QueryContext(ctx, q, userID)
 
@@ -325,9 +328,9 @@ where s.user_id = $1`
 		var secret model.Secret
 		var currentVersionID sql.NullString
 		var titleEnc []byte
-		err := rows.Scan(&secret.ID, &secret.UserID, &currentVersionID, 
+		err := rows.Scan(&secret.ID, &secret.UserID, &currentVersionID,
 			&secret.CreatedAt, &secret.UpdatedAt, &secret.DeletedAt, &titleEnc)
-		
+
 		if err != nil {
 			return nil, err
 		}
