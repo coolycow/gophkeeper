@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -44,13 +45,13 @@ type Model struct {
 
 	api *clientgrpc.Client // клиент gRPC
 
-	emailTI     textinput.Model // поле ввода email
-	passTI      textinput.Model // поле ввода пароля
-	passAgainTI textinput.Model   // поле ввода пароля ещё раз
-	createInputs  []textinput.Model // поля формы «новый / правка секрета»
-	createFieldKeys []string      // ключи полей (порядок = порядок createInputs)
-	createFormFocus int           // фокус в форме создания
-	formFocus     int             // фокус на поле ввода (логин / регистрация)
+	emailTI         textinput.Model   // поле ввода email
+	passTI          textinput.Model   // поле ввода пароля
+	passAgainTI     textinput.Model   // поле ввода пароля ещё раз
+	createInputs    []textinput.Model // поля формы «новый / правка секрета»
+	createFieldKeys []string          // ключи полей (порядок = порядок createInputs)
+	createFormFocus int               // фокус в форме создания
+	formFocus       int               // фокус на поле ввода (логин / регистрация)
 
 	passwordSession string // пароль сессии
 
@@ -59,6 +60,7 @@ type Model struct {
 
 	detailID      string              // ID секрета
 	detailPayload *clientdata.Payload // payload секрета
+	detailReveal  bool                // показать пароль и др. скрытые поля в просмотре
 
 	createKind      clientdata.Kind   // тип секрета
 	createDraft     map[string]string // draft секрета
@@ -128,6 +130,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if m.v == viewDetail {
 				m.v = viewList
+				m.detailReveal = false
 				m.errLine = ""
 				return m, nil
 			}
@@ -541,6 +544,7 @@ func (m *Model) openDetail(secretID string) (tea.Model, tea.Cmd) {
 	// сохраняем данные секрета
 	m.detailID = secretID
 	m.detailPayload = p
+	m.detailReveal = false
 	m.v = viewDetail
 	m.errLine = ""
 
@@ -549,11 +553,33 @@ func (m *Model) openDetail(secretID string) (tea.Model, tea.Cmd) {
 
 // updateDetail обновляет состояние при открытии деталей секрета
 func (m *Model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if key, ok := msg.(tea.KeyMsg); ok && (key.String() == "e" || key.String() == "E") {
+	key, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return m, nil
+	}
+	switch key.String() {
+	case "e", "E":
 		m.startCreateWizard(m.detailID)
 		return m, textinput.Blink
+	case "h", "H":
+		m.detailReveal = !m.detailReveal
+		m.info = ""
+		m.errLine = ""
+		return m, nil
+	case "c", "C":
+		if m.detailPayload == nil || m.detailPayload.Kind != clientdata.KindLoginPair {
+			return m, nil
+		}
+		if err := clipboard.WriteAll(m.detailPayload.Password); err != nil {
+			m.errLine = fmt.Sprintf("Буфер: %v", err)
+		} else {
+			m.errLine = ""
+			m.info = "Пароль скопирован"
+		}
+		return m, nil
+	default:
+		return m, nil
 	}
-	return m, nil
 }
 
 // resetCreateWizard сбрасывает состояние при создании секрета
@@ -584,17 +610,17 @@ func fieldKeysForKind(k clientdata.Kind) []string {
 
 func fieldPlaceholder(key string) string {
 	return map[string]string{
-		"meta":            "Метаданные (можно пусто)",
-		"title":           "Заголовок",
-		"login":           "Логин",
-		"password":        "Пароль",
-		"url":             "URL (можно пусто)",
-		"text":            "Текст",
-		"binary_base64":   "Данные в Base64",
-		"card_holder":     "Имя на карте",
-		"card_number":     "Номер карты",
-		"expiry":          "Срок (MM/YY)",
-		"cvc":             "CVC",
+		"meta":          "Метаданные (можно пусто)",
+		"title":         "Заголовок",
+		"login":         "Логин",
+		"password":      "Пароль",
+		"url":           "URL (можно пусто)",
+		"text":          "Текст",
+		"binary_base64": "Данные в Base64",
+		"card_holder":   "Имя на карте",
+		"card_number":   "Номер карты",
+		"expiry":        "Срок (MM/YY)",
+		"cvc":           "CVC",
 	}[key]
 }
 
@@ -866,9 +892,13 @@ func (m *Model) View() string {
 	case viewDetail:
 		b.WriteString(fmt.Sprintf("Секрет %s\n\n", shortID(m.detailID)))
 		if m.detailPayload != nil {
-			b.WriteString(renderPayload(m.detailPayload))
+			b.WriteString(renderPayload(m.detailPayload, m.detailReveal))
 		}
-		b.WriteString(hintStyle.Render("\ne — редактировать, Esc — к списку\n"))
+		hints := "h — показать/скрыть скрытые данные, e — редактировать, Esc — к списку"
+		if m.detailPayload != nil && m.detailPayload.Kind == clientdata.KindLoginPair {
+			hints = "h — показать/скрыть скрытые данные, c — скопировать пароль, e — редактировать, Esc — к списку"
+		}
+		b.WriteString(hintStyle.Render("\n" + hints + "\n"))
 	// экран создания секрета
 	case viewCreate:
 		if m.createKind == "" {
@@ -900,8 +930,8 @@ func (m *Model) View() string {
 	return b.String()
 }
 
-// renderPayload рендерит payload в строку
-func renderPayload(p *clientdata.Payload) string {
+// renderPayload рендерит payload в строку. reveal задаёт, показывать ли чувствительные поля (пароль и т.д.).
+func renderPayload(p *clientdata.Payload, reveal bool) string {
 	// создаем билдер для сборки строки
 	var b strings.Builder
 
@@ -913,7 +943,11 @@ func renderPayload(p *clientdata.Payload) string {
 	switch p.Kind {
 	// тип логин/пароль
 	case clientdata.KindLoginPair:
-		fmt.Fprintf(&b, "Тип: логин/пароль\nЗаголовок: %s\nЛогин: %s\nПароль: ***\nURL: %s\n", p.Title, p.Login, p.URL)
+		pw := "***"
+		if reveal {
+			pw = p.Password
+		}
+		fmt.Fprintf(&b, "Тип: логин/пароль\nЗаголовок: %s\nЛогин: %s\nПароль: %s\nURL: %s\n", p.Title, p.Login, pw, p.URL)
 	// тип текст
 	case clientdata.KindText:
 		fmt.Fprintf(&b, "Тип: текст\n%s\n", p.Text)
