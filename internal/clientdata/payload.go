@@ -105,8 +105,24 @@ func (p *Payload) SetBinary(b []byte) {
 
 // VersionListTitle — строка, которую клиент шифрует в title_encrypted версии (одинаковая логика для всех Kind).
 // Всегда непустая (после trim), чтобы согласоваться с NOT NULL title_encrypted в БД и не шифровать пустой UTF-8.
+// Логика:
+// 1. Если p == nil, используем значение "секрет".
+//
+// 2. Если Kind == KindLoginPair:
+//   - Если Title не пустой, используем его.
+//   - Если Title пустой, используем Meta.
+//   - Если Title и Meta пустые, используем "логин/пароль".
+//
+// 3. Если Kind == KindText:
+//   - Если Meta не пустое, используем его.
+//   - Если Meta пустое, используем "текст".
+//
+// 4. Если Kind == KindBinary:
+//   - Если Meta не пустое, используем его.
+//   - Если Meta пустое, используем "бинарные данные".
 func VersionListTitle(p *Payload) string {
 	var s string
+
 	if p == nil {
 		s = "секрет"
 	} else {
@@ -141,8 +157,11 @@ func VersionListTitle(p *Payload) string {
 			s = "секрет"
 		}
 	}
+
+	// проверяем, что строка не пустая
 	if strings.TrimSpace(s) == "" {
 		return "секрет"
 	}
+
 	return s
 }
