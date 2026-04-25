@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/coolycow/gophkeeper/internal/buildinfo"
@@ -73,9 +74,17 @@ type Model struct {
 	sessionPath string // путь к сессии
 }
 
+// стили для текста
 var titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")) // желтый цвет для заголовков (жирный, розовый)
 var errStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))              // красный цвет для ошибок (красный)
 var hintStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))             // серый цвет для подсказок (серый)
+
+// стили таблицы списка секретов
+var listHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))                              // заголовки столбцов
+var listDateColStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))                                       // даты
+var listTitleColStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))                                      // название
+var listRowSelectedStyle = lipgloss.NewStyle().Background(lipgloss.Color("238")).Foreground(lipgloss.Color("255")) // выбранная строка
+var listTableBorderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))                                   // линия под заголовком
 
 // New создаёт начальную модель TUI.
 func New(cfg *config.ConfigClient) tea.Model {
@@ -691,24 +700,33 @@ func kindTitleRU(k clientdata.Kind) string {
 
 // buildCreateFormInputs собирает поля ввода для выбранного типа (значения из createDraft).
 func (m *Model) buildCreateFormInputs() {
+	// получаем поля для выбранного типа
 	keys := fieldKeysForKind(m.createKind)
 	m.createFieldKeys = keys
 	m.createInputs = make([]textinput.Model, len(keys))
+
+	// создаем поля ввода для каждого поля
 	for i, key := range keys {
 		ti := textinput.New()
 		ti.Placeholder = fieldPlaceholder(key)
 		ti.Width = 56
 		ti.CharLimit = 0
+
+		// устанавливаем режим отображения пароля для пароля и CVC
 		if key == "password" || key == "cvc" {
 			ti.EchoMode = textinput.EchoPassword
 		} else {
 			ti.EchoMode = textinput.EchoNormal
 		}
+
+		// устанавливаем значение для поля
 		if v, ok := m.createDraft[key]; ok {
 			ti.SetValue(v)
 		}
+
 		m.createInputs[i] = ti
 	}
+
 	m.createFormFocus = 0
 	m.focusCreateForm()
 }
@@ -840,10 +858,13 @@ func (m *Model) prefillDraftFromPayload() {
 // finishCreate завершает создание секрета
 func (m *Model) finishCreate() (tea.Model, tea.Cmd) {
 	m.syncCreateDraftFromInputs()
-	p := &clientdata.Payload{Kind: m.createKind, Meta: m.createDraft["meta"]}
+
+	// создаем payload для данных секрета (заголовок, метаданные, заголовок)
+	p := &clientdata.Payload{Kind: m.createKind, Meta: m.createDraft["meta"], Title: m.createDraft["title"]}
+
+	// устанавливаем значения для полей
 	switch m.createKind {
 	case clientdata.KindLoginPair:
-		p.Title = m.createDraft["title"]
 		p.Login = m.createDraft["login"]
 		p.Password = m.createDraft["password"]
 		p.URL = m.createDraft["url"]
@@ -954,21 +975,8 @@ func (m *Model) View() string {
 		b.WriteString("Секреты (активные)\n\n")
 		if len(m.secrets) == 0 {
 			b.WriteString("(пусто — нажмите n чтобы добавить)\n")
-		}
-		for i, s := range m.secrets {
-			// получаем название секрета
-			title := shortID(s.GetId())
-			if i < len(m.secretListTitles) && m.secretListTitles[i] != "" {
-				title = m.secretListTitles[i]
-			}
-
-			// форматируем строку для вывода
-			line := fmt.Sprintf("%s  созд.: %s  изм.: %s", trimMiddle(title, 40), formatTs(s.GetCreatedAt()), formatTs(s.GetUpdatedAt()))
-			if i == m.cursor {
-				b.WriteString("> " + line + "\n")
-			} else {
-				b.WriteString("  " + line + "\n")
-			}
+		} else {
+			b.WriteString(renderSecretListTable(m))
 		}
 		b.WriteString(hintStyle.Render("\nj/k — курсор, Enter — открыть, n — новый, d — удалить, r — обновить, q — в меню\n"))
 	// экран деталей секрета
@@ -1013,7 +1021,99 @@ func (m *Model) View() string {
 	return b.String()
 }
 
-// renderPayload рендерит payload в строку. reveal задаёт, показывать ли чувствительные поля (пароль и т.д.).
+const (
+	listDateColW = 16 // "2006-01-02 15:04"
+	listColGapW  = 2  // зазор между столбцами
+)
+
+// listTableTitleWidth — ширина колонки «Название» в ячейках дисплея.
+func listTableTitleWidth(termW int) int {
+	if termW < 1 {
+		termW = 100
+	}
+	used := 2 + listDateColW + listColGapW + listDateColW + listColGapW
+	tw := termW - used
+	if tw < 14 {
+		tw = 14
+	}
+	return tw
+}
+
+// padListCell обрезает или дополняет строку до фиксированной ширины в терминале (корректно для wide runes).
+func padListCell(s string, targetWidth int) string {
+	if targetWidth < 1 {
+		return ""
+	}
+	w := runewidth.StringWidth(s)
+	if w > targetWidth {
+		return runewidth.Truncate(s, targetWidth, "…")
+	}
+	return s + strings.Repeat(" ", targetWidth-w)
+}
+
+// renderSecretListTable рисует выровненные колонки с цветом и выделением курсора.
+func renderSecretListTable(m *Model) string {
+	termW := m.width
+	if termW < 1 {
+		termW = 100
+	}
+	tw := listTableTitleWidth(termW)
+	gap := strings.Repeat(" ", listColGapW)
+	totalLineW := 2 + tw + listColGapW + listDateColW + listColGapW + listDateColW
+	sepW := totalLineW
+	if sepW > termW-1 {
+		sepW = termW - 1
+	}
+	if sepW < 8 {
+		sepW = 8
+	}
+
+	var b strings.Builder
+	h1 := listHeaderStyle.Render(padListCell("Название", tw))
+	h2 := listHeaderStyle.Render(padListCell("Создан", listDateColW))
+	h3 := listHeaderStyle.Render(padListCell("Изменён", listDateColW))
+	b.WriteString("  ")
+	b.WriteString(h1)
+	b.WriteString(gap)
+	b.WriteString(h2)
+	b.WriteString(gap)
+	b.WriteString(h3)
+	b.WriteString("\n")
+	b.WriteString(listTableBorderStyle.Render(strings.Repeat("─", sepW)))
+	b.WriteString("\n")
+
+	for i, s := range m.secrets {
+		title := shortID(s.GetId())
+		if i < len(m.secretListTitles) && m.secretListTitles[i] != "" {
+			title = m.secretListTitles[i]
+		}
+		created := formatTs(s.GetCreatedAt())
+		updated := formatTs(s.GetUpdatedAt())
+		pref := "  "
+		if i == m.cursor {
+			pref = "> "
+		}
+		tCell := padListCell(title, tw)
+		cCell := padListCell(created, listDateColW)
+		uCell := padListCell(updated, listDateColW)
+		line := tCell + gap + cCell + gap + uCell
+		if i == m.cursor {
+			b.WriteString(listRowSelectedStyle.Render(pref+line) + "\n")
+		} else {
+			b.WriteString(pref)
+			b.WriteString(listTitleColStyle.Render(tCell))
+			b.WriteString(gap)
+			b.WriteString(listDateColStyle.Render(cCell))
+			b.WriteString(gap)
+			b.WriteString(listDateColStyle.Render(uCell))
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+// renderPayload рендерит payload в строку.
+// reveal задаёт, показывать ли чувствительные поля (пароль и т.д.).
 func renderPayload(p *clientdata.Payload, reveal bool) string {
 	// создаем билдер для сборки строки
 	var b strings.Builder
@@ -1023,10 +1123,13 @@ func renderPayload(p *clientdata.Payload, reveal bool) string {
 	switch p.Kind {
 	// тип логин/пароль
 	case clientdata.KindLoginPair:
+		// По умолчанию пароль скрыт, если reveal = true (была нажата h), то показываем пароль
 		pw := "***"
+
 		if reveal {
 			pw = p.Password
 		}
+
 		fmt.Fprintf(&b, "Тип: логин/пароль\nЛогин: %s\nПароль: %s\nURL: %s\n", p.Login, pw, p.URL)
 	// тип текст
 	case clientdata.KindText:
@@ -1036,7 +1139,14 @@ func renderPayload(p *clientdata.Payload, reveal bool) string {
 		fmt.Fprintf(&b, "Тип: бинарные данные (base64)\n%s\n", trimMiddle(p.BinaryBase64, 120))
 	// тип банковская карта
 	case clientdata.KindBankCard:
-		fmt.Fprintf(&b, "Тип: банковская карта\nДержатель: %s\nНомер: %s\nСрок: %s\n", p.CardHolder, trimMiddle(p.CardNumber, 8), p.Expiry)
+		// По умолчанию CVC скрыт, если reveal = true (была нажата h), то показываем CVC
+		cvc := "***"
+
+		if reveal {
+			cvc = p.CVC
+		}
+
+		fmt.Fprintf(&b, "Тип: банковская карта\nДержатель: %s\nНомер: %s\nСрок: %s\nCVC: %s\n", p.CardHolder, trimMiddle(p.CardNumber, 8), p.Expiry, cvc)
 	}
 
 	// добавляем метаданные, если они есть
