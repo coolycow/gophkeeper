@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,9 +23,9 @@ func TestInitConfigClientWithArgs_defaults(t *testing.T) {
 	cfg, err := InitConfigClientWithArgs(nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, "127.0.0.1:8080", cfg.ServerAddress)
+	assert.Equal(t, "127.0.0.1:8081", cfg.ServerAddress)
 	assert.Equal(t, "", cfg.Email)
-	assert.Equal(t, getDefaultConfigFile(), cfg.Config)
+	assert.Equal(t, getDefaultClientConfigFile(), cfg.Config)
 }
 
 func TestInitConfigClientWithArgs_flags(t *testing.T) {
@@ -131,4 +133,32 @@ func TestInitConfigClientEnvOverridesFlags(t *testing.T) {
 	cfg := loadFromFlagsAndEnvClient(t, []string{"--server-address", "from-flag:9999", "--email", "from-flag@mail"})
 	assert.Equal(t, "from-env:8080", cfg.ServerAddress)
 	assert.Equal(t, "from-env@mail", cfg.Email)
+}
+
+func TestInitConfigClientWithArgs_versionFlag(t *testing.T) {
+	cfg, err := InitConfigClientWithArgs([]string{"--version"})
+	require.NoError(t, err)
+	assert.True(t, cfg.ShowVersion)
+}
+
+func TestInitConfigClientWithArgs_grpcInsecure(t *testing.T) {
+	cfg, err := InitConfigClientWithArgs([]string{"--grpc-insecure"})
+	require.NoError(t, err)
+	assert.True(t, cfg.GRPCInsecure)
+}
+
+func TestMergeConfigClientFromFile_tlsFields(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "c.json")
+	data := `{
+  "server_address": "h:9",
+  "tls_ca_file": "ca.pem",
+  "grpc_insecure": true
+}`
+	require.NoError(t, os.WriteFile(path, []byte(data), 0o600))
+	cfg := defaultConfigClient()
+	require.NoError(t, mergeConfigClientFromFile(&cfg, path))
+	assert.Equal(t, "h:9", cfg.ServerAddress)
+	assert.Equal(t, "ca.pem", cfg.TLSCAFile)
+	assert.True(t, cfg.GRPCInsecure)
 }

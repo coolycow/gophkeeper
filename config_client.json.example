@@ -1,4 +1,6 @@
 {
-  "server_address": "127.0.0.1",
-  "email": "test@gophkeeper.com",
+  "server_address": "127.0.0.1:8081",
+  "email": "",
+  "tls_ca_file": "",
+  "grpc_insecure": false
 }

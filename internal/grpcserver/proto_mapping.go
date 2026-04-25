@@ -8,12 +8,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// timeProto преобразует time.Time в timestamppb.Timestamp.
-func timeProto(t time.Time) *timestamppb.Timestamp {
-	if t.IsZero() {
+// timeProtoPtr преобразует *time.Time (nil — не задано) в timestamppb.Timestamp.
+func timeProtoPtr(t *time.Time) *timestamppb.Timestamp {
+	if t == nil || t.IsZero() {
 		return nil
 	}
-	return timestamppb.New(t)
+	return timestamppb.New(*t)
 }
 
 // protoSecretVersion преобразует model.SecretVersion в gophkeeperpb.SecretVersion.
@@ -28,9 +28,9 @@ func protoSecretVersion(v *model.SecretVersion) *gophkeeperpb.SecretVersion {
 		DataFormatVersion: int32(v.DataFormatVersion),
 		DataEncrypted:     v.DataEncrypted,
 		DataSize:          int32(v.DataSize),
-		CreatedAt:         timeProto(*v.CreatedAt),
-		UpdatedAt:         timeProto(*v.UpdatedAt),
-		DeletedAt:         timeProto(*v.DeletedAt),
+		CreatedAt:         timeProtoPtr(v.CreatedAt),
+		UpdatedAt:         timeProtoPtr(v.UpdatedAt),
+		DeletedAt:         timeProtoPtr(v.DeletedAt),
 	}
 }
 
@@ -43,9 +43,9 @@ func protoSecret(s *model.Secret, current *model.SecretVersion, history []*model
 		Id:                     s.ID,
 		UserId:                 s.UserID,
 		CurrentSecretVersionId: s.CurrentSecretVersionID,
-		CreatedAt:              timeProto(*s.CreatedAt),
-		UpdatedAt:              timeProto(*s.UpdatedAt),
-		DeletedAt:              timeProto(*s.DeletedAt),
+		CreatedAt:              timeProtoPtr(s.CreatedAt),
+		UpdatedAt:              timeProtoPtr(s.UpdatedAt),
+		DeletedAt:              timeProtoPtr(s.DeletedAt),
 		CurrentVersion:         protoSecretVersion(current),
 	}
 	if includeHistory && len(history) > 0 {
@@ -71,7 +71,7 @@ func protoAttachmentSummary(a *model.AttachmentSummary) *gophkeeperpb.Attachment
 		InfoEncrypted:     a.InfoEncrypted,
 		InfoSize:          int32(a.InfoSize),
 		DataSize:          int32(a.DataSize),
-		CreatedAt:         timeProto(*a.CreatedAt),
+		CreatedAt:         timeProtoPtr(a.CreatedAt),
 	}
 }
 
@@ -89,6 +89,6 @@ func protoAttachment(a *model.Attachment) *gophkeeperpb.Attachment {
 		InfoSize:          int32(a.InfoSize),
 		DataEncrypted:     a.DataEncrypted,
 		DataSize:          int32(a.DataSize),
-		CreatedAt:         timeProto(*a.CreatedAt),
+		CreatedAt:         timeProtoPtr(a.CreatedAt),
 	}
 }

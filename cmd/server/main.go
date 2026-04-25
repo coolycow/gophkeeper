@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coolycow/gophkeeper/internal/buildinfo"
 	"github.com/coolycow/gophkeeper/internal/config"
 	"github.com/coolycow/gophkeeper/internal/grpcserver"
 	"github.com/coolycow/gophkeeper/internal/logger"
@@ -26,24 +26,19 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var (
-	buildVersion string
-	buildDate    string
-	buildCommit  string
-)
+// Сюда подставляются значения при сборке через -ldflags (см. README.md).
+var buildVersion, buildDate, buildCommit string
 
-func orNA(s string) string {
-	if s == "" {
-		return "N/A"
-	}
-	return s
+// init инициализирует информацию о сборке
+func init() {
+	buildinfo.Version = buildVersion    // ldflags: -X main.buildVersion=...
+	buildinfo.BuildDate = buildDate     // ldflags: -X main.buildDate=...
+	buildinfo.BuildCommit = buildCommit // ldflags: -X main.buildCommit=...
 }
 
 func main() {
 	// Вывод информации о сборке при старте
-	fmt.Fprintf(os.Stdout, "Build version: %s\n", orNA(buildVersion))
-	fmt.Fprintf(os.Stdout, "Build date: %s\n", orNA(buildDate))
-	fmt.Fprintf(os.Stdout, "Build commit: %s\n", orNA(buildCommit))
+	buildinfo.Fprint(os.Stdout)
 
 	// Инициализируем настройки (приоритет: окружение, флаги, дефолт)
 	cfg, err := config.InitConfigServer()

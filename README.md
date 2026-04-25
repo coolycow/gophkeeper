@@ -129,7 +129,57 @@
 
 ---
 
+## Клиент (CLI / TUI)
+
+Собранное приложение подключается к **gRPC**-порту сервера (не к HTTP). По умолчанию в коде клиента задан адрес `127.0.0.1:8081` — убедитесь, что он совпадает с `HOST:GRPC_PORT` в конфигурации сервера.
+
+### Сборка и версия
+
+```bash
+go build -o gophkeeper-client -ldflags "-X main.buildVersion=1.0.0 -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.buildCommit=$(git rev-parse --short HEAD)" ./cmd/client
+```
+
+*При сборке для Windows использовать `gophkeeper-client.exe`*
+
+Показать версию без запуска интерфейса:
+
+```bash
+go run ./cmd/client -v
+```
+
+### Запуск
+
+```bash
+go run ./cmd/client
+```
+
+Полезные флаги (приоритет как у сервера: JSON → окружение → флаги): `-a` / `--server-address` (gRPC), `-m` / `--email`, `--grpc-insecure` (без TLS, только для разработки), `--tls-ca-file` (PEM доверенного CA при self-signed), `-c` / `--config` — путь к JSON (шаблон: [`config_client.json.example`](config_client.json.example)).
+
+Переменные окружения: `SERVER_ADDRESS`, `EMAIL`, `TLS_CA_FILE`, `GRPC_INSECURE`, `SHOW_VERSION`, `CONFIG`.
+
+После успешного входа refresh-токен сохраняется в файл сессии в каталоге конфигурации пользователя (`…/gophkeeper/session.json` на Windows/Linux/macOS). Содержимое секретов шифруется на клиенте (`data_format_version = 1`: префикс блоба `GK01`, ключ Argon2id + AES-256-GCM) — см. `internal/secretcrypto`.
+
+### Тесты клиентских пакетов
+
+```bash
+go test -cover ./internal/buildinfo/... ./internal/clientdata/... ./internal/clientgrpc/... ./internal/clientsession/... ./internal/secretcrypto/... ./internal/tui/...
+```
+
+---
+
 ## Запуск сервера
+
+### Сборка и версия
+
+Те же переменные линковки, что в [`cmd/server/main.go`](cmd/server/main.go): `main.buildVersion`, `main.buildDate`, `main.buildCommit`.
+
+```bash
+go build -o gophkeeper-server -ldflags "-X main.buildVersion=1.0.0 -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.buildCommit=$(git rev-parse --short HEAD)" ./cmd/server
+```
+
+*При сборке для Windows использовать `gophkeeper-server.exe`*
+
+При **каждом** старте сервер печатает в stdout три строки `Build version`, `Build date`, `Build commit` (до загрузки конфигурации). Отдельного флага «только версия» у сервера нет: для проверки можно собрать бинарник и выполнить `./gophkeeper-server` — при ошибке конфигурации строки сборки всё равно будут выведены первыми.
 
 Из корня репозитория (после настройки `DATABASE_DSN` и при необходимости `config_server.json`):
 
