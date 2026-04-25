@@ -1239,6 +1239,10 @@ func (m *Model) View() string {
 		b.WriteString(hintStyle.Render("\nTab — поле, Enter — создать аккаунт, Esc — назад\n"))
 	// экран списка секретов
 	case viewList:
+		// Выводим Email пользователя
+		b.WriteString(hintStyle.Render(fmt.Sprintf("Email: %s\n", m.emailTI.Value())))
+		b.WriteString("\n")
+
 		// Выводим заголовок списка секретов
 		b.WriteString("Секреты (активные)\n\n")
 
