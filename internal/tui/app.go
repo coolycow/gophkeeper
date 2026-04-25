@@ -61,10 +61,11 @@ type Model struct {
 	secretListVers   []int32                       // номера текущих версий (тот же порядок, что secrets)
 	cursor           int                           // курсор на секрете
 
-	detailID               string              // ID секрета
-	detailPayload          *clientdata.Payload // payload секрета
-	detailReveal           bool                // показать пароль и др. скрытые поля в просмотре
-	detailCurrentVersionID string
+	detailID               string                        // ID секрета
+	detailPayload          *clientdata.Payload           // payload секрета
+	detailReveal           bool                          // показать пароль и др. скрытые поля в просмотре
+	detailCurrentVersionID string                        // ID текущей версии секрета
+	detailShownVersionID   string                        // версия, которую сейчас показываем в payload-блоке
 	detailVersions         []*gophkeeperpb.SecretVersion // список версий секрета
 	detailVersionTitles    []string                      // расшифрованные title версий
 	detailVersionCursor    int                           // курсор на версии секрета
@@ -645,16 +646,26 @@ func (m *Model) reloadDetail(secretID, preferredVersionID string) error {
 	m.detailID = secretID
 	m.detailPayload = p
 	m.detailCurrentVersionID = sec.GetCurrentSecretVersionId()
+
+	// если текущая версия не установлена, устанавливаем её на основе ID текущей версии
 	if m.detailCurrentVersionID == "" {
 		m.detailCurrentVersionID = cv.GetId()
 	}
+
+	// устанавливаем ID версии, которую сейчас показываем в payload-блоке
+	m.detailShownVersionID = m.detailCurrentVersionID
+
+	// устанавливаем список версий секрета
 	m.detailVersions = versions
+
+	// заполняем заголовки версий секрета
 	m.fillDetailVersionTitles(key)
 	m.pickDetailVersionCursor(preferredVersionID)
 
 	return nil
 }
 
+// fillDetailVersionTitles заполняет заголовки версий секрета
 func (m *Model) fillDetailVersionTitles(key []byte) {
 	m.detailVersionTitles = make([]string, len(m.detailVersions))
 	for i, v := range m.detailVersions {
@@ -676,6 +687,7 @@ func (m *Model) fillDetailVersionTitles(key []byte) {
 	}
 }
 
+// pickDetailVersionCursor выбирает курсор на версии секрета
 func (m *Model) pickDetailVersionCursor(preferredVersionID string) {
 	if len(m.detailVersions) == 0 {
 		m.detailVersionCursor = 0
@@ -706,6 +718,41 @@ func (m *Model) selectedDetailVersion() *gophkeeperpb.SecretVersion {
 	return m.detailVersions[m.detailVersionCursor]
 }
 
+// loadDetailPayloadFromVersion загружает payload из выбранной версии секрета
+func (m *Model) loadDetailPayloadFromVersion(v *gophkeeperpb.SecretVersion) error {
+	// проверяем, что версия не выбрана
+	if v == nil {
+		return fmt.Errorf("версия не выбрана")
+	}
+
+	// получаем ключ для расшифровки данных
+	key, err := secretcrypto.DeriveKeyFromPassword(m.passwordSession, m.api.SaltHex())
+	if err != nil {
+		return fmt.Errorf("ключ: %w", err)
+	}
+
+	// расшифровываем данные секрета
+	plain, err := secretcrypto.DecryptWithKey(v.GetDataEncrypted(), key)
+	if err != nil {
+		return fmt.Errorf("расшифровка: %w", err)
+	}
+
+	// десериализуем данные секрета
+	p, err := clientdata.UnmarshalJSONBytes(plain)
+	if err != nil {
+		return fmt.Errorf("формат данных: %w", err)
+	}
+
+	// сохраняем payload из выбранной версии секрета
+	m.detailPayload = p
+
+	// устанавливаем ID версии, которую сейчас показываем в payload-блоке
+	m.detailShownVersionID = v.GetId()
+
+	// возвращаем nil, если ошибки нет
+	return nil
+}
+
 // updateDetail обновляет состояние при открытии деталей секрета
 func (m *Model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
 	key, ok := msg.(tea.KeyMsg)
@@ -725,6 +772,25 @@ func (m *Model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		return m.restoreSelectedDetailVersion()
+	case " ", "space":
+		v := m.selectedDetailVersion()
+
+		// загружаем payload из выбранной версии секрета
+		if err := m.loadDetailPayloadFromVersion(v); err != nil {
+			m.errLine = fmt.Sprintf("Просмотр версии: %v", err)
+			return m, nil
+		}
+
+		// устанавливаем сообщение об ошибке
+		m.errLine = ""
+
+		// устанавливаем сообщение об информации
+		if v.GetId() == m.detailCurrentVersionID {
+			m.info = "Просмотр текущей версии"
+		} else {
+			m.info = fmt.Sprintf("Просмотр версии %d (без назначения текущей)", v.GetVersion())
+		}
+		return m, nil
 	case "x", "X":
 		return m.deleteSelectedDetailVersion()
 	case "z", "Z":
@@ -1192,11 +1258,21 @@ func (m *Model) View() string {
 
 		// Выводим payload секрета
 		if m.detailPayload != nil {
+			// Выводим сообщение о выбранной версии секрета
+			if m.detailShownVersionID != "" && m.detailShownVersionID != m.detailCurrentVersionID {
+				b.WriteString(hintStyle.Render("Просмотр: неактуальная версия\n"))
+			} else {
+				b.WriteString(hintStyle.Render("Просмотр: текущая версия\n"))
+			}
+
+			// Выводим payload секрета
+			b.WriteString("\n")
 			b.WriteString(renderPayload(m.detailPayload, m.detailReveal))
 		}
 
 		// Вывродим список версий секрета
-		b.WriteString("\nИСТОРИЯ ВЕРСИЙ СЕКРЕТА:\n\n")
+		b.WriteString(hintStyle.Render("\nИСТОРИЯ ВЕРСИЙ СЕКРЕТА:\n"))
+		b.WriteString("\n")
 		if len(m.detailVersions) == 0 {
 			b.WriteString("(версии не найдены)\n")
 		} else {
@@ -1204,11 +1280,11 @@ func (m *Model) View() string {
 		}
 
 		// добавляем подсказки для экрана деталей секрета
-		hints := "j/k — выбор версии, Enter — сделать текущей, x — удалить версию, z — compress, h — показать/скрыть, e — редактировать, Esc — к списку"
+		hints := "j/k — выбор версии, Space — посмотреть, Enter — сделать текущей, x — удалить версию, z — compress, h — показать/скрыть, e — редактировать, Esc — к списку"
 
 		// добавляем подсказки для экрана деталей секрета, если payload является логином/паролем
 		if m.detailPayload != nil && m.detailPayload.Kind == clientdata.KindLoginPair {
-			hints = "j/k — выбор версии, Enter — сделать текущей, x — удалить версию, z — compress, h — показать/скрыть, c — скопировать пароль, e — редактировать, Esc — к списку"
+			hints = "j/k — выбор версии, Space — посмотреть, Enter — сделать текущей, x — удалить версию, z — compress, h — показать/скрыть, c — скопировать пароль, e — редактировать, Esc — к списку"
 		}
 
 		b.WriteString(hintStyle.Render("\n" + hints + "\n"))
