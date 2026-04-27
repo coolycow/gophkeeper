@@ -229,3 +229,6 @@ protoc -I proto -I . --go_out=. --go_opt=module=github.com/coolycow/gophkeeper -
 При необходимости можно вместо `-I proto` указать `-I <каталог include из установки protoc>`.
 
 Результат: `internal/proto/gophkeeperpb/*.pb.go` — их коммитят в репозиторий и не правят вручную.
+
+## Для проверки
+Создана отдельная ветка `iter1` и `PR` для проверки.
