@@ -79,7 +79,7 @@ func (c *ConfigServer) PrintConfig() {
 
 	// Формируем строку с настройками
 	fmt.Fprintf(&b, "Host=%s Port=%d GrpcPort=%d; ", c.Host, c.Port, c.GrpcPort)
-	fmt.Fprintf(&b, "LogLevel=%s  DatabaseDSN=%s RunMigrations=%t; ", c.LogLevel, c.DatabaseDSN, c.RunMigrations)
+	fmt.Fprintf(&b, "LogLevel=%s  RunMigrations=%t; ", c.LogLevel, c.RunMigrations)
 	fmt.Fprintf(&b, "EnableHTTPS=%t TLSCertFile=%s TLSKeyFile=%s TrustedSubnet=%s Config=%s; ",
 		c.EnableHTTPS, c.TLSCertFile, c.TLSKeyFile, c.TrustedSubnet, c.Config)
 	fmt.Fprintf(&b, "SecretVersionCount=%d; ", c.SecretVersionCount)

@@ -177,28 +177,6 @@ func isUnauthenticated(err error) bool {
 	return ok && st.Code() == codes.Unauthenticated
 }
 
-// doRefresh обновляет токены с помощью refresh токена.
-func (c *Client) doRefresh(ctx context.Context) error {
-	// Блокируем доступ к refresh токену для синхронизации
-	c.mu.Lock()
-	rt := c.refreshToken
-	c.mu.Unlock()
-
-	// Проверяем, что refresh токен не пустой
-	if rt == "" {
-		return fmt.Errorf("clientgrpc: refresh: empty refresh token")
-	}
-
-	// Вызываем RPC RefreshToken
-	resp, err := c.svc.RefreshToken(ctx, &gophkeeperpb.RefreshTokenRequest{RefreshToken: rt})
-
-	if err != nil {
-		return err
-	}
-
-	return c.ApplyAuthResponse(resp)
-}
-
 // call выполняет аутентифицированный unary RPC; при Unauthenticated выполняет Refresh и повторяет.
 func (c *Client) call(ctx context.Context, fn func(ctx context.Context) error) error {
 	// Блокируем доступ к access токену для синхронизации
@@ -217,7 +195,7 @@ func (c *Client) call(ctx context.Context, fn func(ctx context.Context) error) e
 	// Проверяем, является ли ошибка Unauthenticated
 	if isUnauthenticated(err) {
 		// Обновляем токены с помощью refresh токена
-		if rerr := c.doRefresh(ctx); rerr != nil {
+		if rerr := c.Refresh(ctx); rerr != nil {
 			return fmt.Errorf("refresh after 401: %w", rerr)
 		}
 		c.mu.Lock()

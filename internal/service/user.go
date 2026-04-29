@@ -270,7 +270,7 @@ func (s *userService) UpdateUser(ctx context.Context, userID string, request mod
 
 	// Обновляем пользователя
 	return s.repo.UpdateUser(ctx, userID, &model.User{
-		Email:     request.Email, // Email может быть изменен или не изменен
+		Email:     user.Email, // актуальный email
 		Password:  user.Password, // Пароль может быть изменен или не изменен
 		Salt:      user.Salt,     // Соль не изменяется
 		UpdatedAt: &now,

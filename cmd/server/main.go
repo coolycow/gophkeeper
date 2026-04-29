@@ -85,7 +85,19 @@ func main() {
 	}()
 
 	// Инициализируем аудит
-	auditNotifier := audit.NewNotifier(cfg.AuditFile, cfg.AuditURL)
+	auditNotifier, err := audit.NewNotifier(cfg.AuditFile, cfg.AuditURL)
+
+	// Если ошибка при инициализации аудита, выводим ошибку и завершаем программу
+	if err != nil {
+		log.Fatalf("Failed to initialize audit: %v", err)
+	}
+
+	// В конце работы приложения необходимо правильно закрыть аудит (если файл не открыт, то ошибки не будет)
+	defer func() {
+		if closeErr := auditNotifier.Close(); closeErr != nil {
+			logger.Log.Error("Error closing audit notifier", zap.Error(closeErr))
+		}
+	}()
 
 	// Инициализируем роутер
 	r := router.NewRouter(cfg, repo, auditNotifier)

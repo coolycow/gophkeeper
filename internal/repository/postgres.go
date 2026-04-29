@@ -191,7 +191,10 @@ func (r *PostgresRepository) CreateUser(ctx context.Context, user *model.User) (
 
 // UpdateUser обновляет пользователя
 func (r *PostgresRepository) UpdateUser(ctx context.Context, userID string, user *model.User) error {
-	row := r.db.QueryRowContext(ctx, "update users set email = $1, password = $2, salt = $3, updated_at = $4, deleted_at = $5 where id = $6", user.Email, user.Password, user.Salt, user.UpdatedAt, user.DeletedAt, userID)
+	row := r.db.QueryRowContext(ctx, `update users 
+	set email = $1, password = $2, salt = $3, updated_at = $4, deleted_at = $5 where id = $6
+	returning id, email, password, salt, created_at, updated_at, deleted_at`,
+		user.Email, user.Password, user.Salt, user.UpdatedAt, user.DeletedAt, userID)
 
 	err := row.Scan(&user.ID, &user.Email, &user.Password, &user.Salt, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 
@@ -757,7 +760,7 @@ func (r *PostgresRepository) HardDeleteOldestSecretVersion(ctx context.Context, 
 		using secrets s
 		where sv.secret_id = s.id
 		  and s.user_id = $1
-		  and sv.secret_id = $2`, secretID, userID)
+		  and sv.secret_id = $2`, userID, secretID)
 
 		if err != nil {
 			return err
@@ -804,7 +807,9 @@ func (r *PostgresRepository) GetAttachmentByID(ctx context.Context, userID strin
 	a.info_format_version, a.info_encrypted, a.info_size, a.data_encrypted, a.data_size, a.created_at 
 	from attachments as a 
 	where a.id = $1 and a.secret_version_id in (
-		select sv.id from secret_versions as sv where sv.secret_id in (select s.id from secrets as s where s.user_id = $2)
+		select sv.id from secret_versions as sv
+		inner join secrets as s on sv.secret_id = s.id
+		where s.user_id = $2
 	)`, attachmentID, userID)
 
 	var attachment model.Attachment
@@ -823,11 +828,13 @@ func (r *PostgresRepository) GetAttachmentByID(ctx context.Context, userID strin
 func (r *PostgresRepository) GetAttachmentsBySecretID(ctx context.Context, userID string, secretID string) ([]*model.AttachmentSummary, error) {
 	// Получаем все вложения по ID секрета по ID пользователя и ID секрета
 	rows, err := r.db.QueryContext(ctx, `select a.id, a.secret_version_id, a.data_format_version, 
-	a.info_format_version, a.info_encrypted, a.info_size, a.data_encrypted, a.data_size, a.created_at 
+	a.info_format_version, a.info_encrypted, a.info_size, a.data_size, a.created_at 
 	from attachments as a
 	where a.secret_version_id in (
-		select sv.id from secret_versions as sv where sv.secret_id in (select s.id from secrets as s where s.user_id = $2)
-	) and sv.secret_id = $1`, userID, secretID)
+		select sv.id from secret_versions as sv
+		inner join secrets as s on sv.secret_id = s.id
+		where s.user_id = $1 and s.id = $2
+	)`, userID, secretID)
 
 	// Ошибка получения всех вложений по ID секрета
 	if err != nil {
@@ -862,11 +869,12 @@ func (r *PostgresRepository) GetAttachmentsBySecretID(ctx context.Context, userI
 func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context, userID string, secretVersionID string) ([]*model.AttachmentSummary, error) {
 	// Получаем все вложения по ID версии секрета по ID пользователя и ID версии секрета
 	rows, err := r.db.QueryContext(ctx, `select a.id, a.secret_version_id, a.data_format_version, 
-	a.info_format_version, a.info_encrypted, a.info_size, a.data_encrypted, a.data_size, a.created_at 
+	a.info_format_version, a.info_encrypted, a.info_size, a.data_size, a.created_at 
 	from attachments as a
-	where secret_version_id = $1 
-	and secret_version_id in (
-		select sv.id from secret_versions as sv where sv.secret_id in (select s.id from secrets as s where s.user_id = $2)
+	where a.secret_version_id in (
+		select sv.id from secret_versions as sv
+		inner join secrets as s on sv.secret_id = s.id
+		where sv.id = $1 and s.user_id = $2
 	)`, secretVersionID, userID)
 
 	// Ошибка получения всех вложений по ID версии секрета
@@ -903,10 +911,13 @@ func (r *PostgresRepository) GetAttachmentsBySecretVersionID(ctx context.Context
 func (r *PostgresRepository) CreateAttachment(ctx context.Context, userID string, secretVersionID string, attachment *model.Attachment) (*model.Attachment, error) {
 	row := r.db.QueryRowContext(ctx, `insert into attachments 
 	(secret_version_id, data_format_version, info_format_version, info_encrypted, info_size, data_encrypted, data_size)
-	values ($1, $2, $3, $4, $5, $6, $7) 
+	select $1, $2, $3, $4, $5, $6, $7
+	from secret_versions as sv
+	inner join secrets as s on sv.secret_id = s.id
+	where sv.id = $1 and s.user_id = $8
 	returning id, secret_version_id, data_format_version, info_format_version, info_encrypted, 
 	info_size, data_encrypted, data_size, created_at`,
-		secretVersionID, attachment.DataFormatVersion, attachment.InfoFormatVersion, attachment.InfoEncrypted, attachment.InfoSize, attachment.DataEncrypted, attachment.DataSize)
+		secretVersionID, attachment.DataFormatVersion, attachment.InfoFormatVersion, attachment.InfoEncrypted, attachment.InfoSize, attachment.DataEncrypted, attachment.DataSize, userID)
 
 	var newAttachment model.Attachment
 	err := row.Scan(&newAttachment.ID, &newAttachment.SecretVersionID, &newAttachment.DataFormatVersion, &newAttachment.InfoFormatVersion,

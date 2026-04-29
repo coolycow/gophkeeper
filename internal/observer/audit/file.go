@@ -11,13 +11,17 @@ import (
 
 // FileReceiver записывает события аудита в файл (каждое событие — новая строка).
 type FileReceiver struct {
-	path string
+	file *os.File
 	mu   sync.Mutex
 }
 
-// NewFileReceiver создаёт приёмник в файл.
-func NewFileReceiver(path string) *FileReceiver {
-	return &FileReceiver{path: path}
+// NewFileReceiver открывает файл для дописывания и держит его открытым до Close.
+func NewFileReceiver(path string) (*FileReceiver, error) {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("open audit file %s: %w", path, err)
+	}
+	return &FileReceiver{file: f}, nil
 }
 
 // Send добавляет событие в конец файла в виде одной строки JSON.
@@ -31,16 +35,9 @@ func (f *FileReceiver) Send(event *model.Audit) error {
 	// Добавляем символ новой строки
 	data = append(data, '\n')
 
-	// Открываем файл для записи
-	file, err := os.OpenFile(f.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("open audit file %s: %w", f.path, err)
-	}
-	defer func() { _ = file.Close() }()
-
 	// Записываем событие в файл
 	f.mu.Lock()
-	_, err = file.Write(data)
+	_, err = f.file.Write(data)
 	f.mu.Unlock()
 
 	// Если ошибка при записи в файл, возвращаем ошибку
@@ -49,4 +46,22 @@ func (f *FileReceiver) Send(event *model.Audit) error {
 	}
 
 	return nil
+}
+
+// Close сбрасывает буферы и закрывает файл.
+func (f *FileReceiver) Close() error {
+	// Блокируем доступ к файлу для синхронизации
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Если файл не открыт, возвращаем nil
+	if f.file == nil {
+		return nil
+	}
+
+	// Закрываем файл
+	err := f.file.Close()
+	f.file = nil
+
+	return err
 }

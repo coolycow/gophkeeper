@@ -2,6 +2,7 @@
 package audit
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -88,18 +89,37 @@ func NewEvent(action, userID, secretID, secretVersionID, attachmentID string) *m
 
 // NewNotifier создаёт Notifier: при auditFile != "" — запись в файл, при auditURL != "" — отправка на URL.
 // Если оба параметра не пустые, то запись в файл и отправка на URL.
-func NewNotifier(auditFile, auditURL string) *Notifier {
+func NewNotifier(auditFile, auditURL string) (*Notifier, error) {
 	n := &Notifier{}
 
-	// Если файл не пустой, то добавляем приёмник в файл
 	if auditFile != "" {
-		n.AddReceiver(NewFileReceiver(auditFile))
+		fr, err := NewFileReceiver(auditFile)
+		if err != nil {
+			return nil, err
+		}
+		n.AddReceiver(fr)
 	}
 
-	// Если URL не пустой, то добавляем приёмник в URL
 	if auditURL != "" {
 		n.AddReceiver(NewURLReceiver(auditURL))
 	}
 
-	return n
+	return n, nil
+}
+
+// Close закрывает приёмники, которым это нужно (например файл аудита).
+func (n *Notifier) Close() error {
+	n.mu.Lock()
+	receivers := append([]Receiver(nil), n.receivers...)
+	n.mu.Unlock()
+
+	var errs []error
+	for _, r := range receivers {
+		if c, ok := r.(interface{ Close() error }); ok {
+			if err := c.Close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errors.Join(errs...)
 }

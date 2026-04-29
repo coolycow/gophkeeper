@@ -81,7 +81,6 @@ func (s *secretService) CreateSecret(ctx context.Context, userID string, request
 		UserID:    userID,
 		CreatedAt: &now,
 		UpdatedAt: &now,
-		DeletedAt: &now,
 		SecretVersions: []*model.SecretVersion{
 			{
 				DataFormatVersion: dfv,
