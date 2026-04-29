@@ -101,7 +101,7 @@ func NewNotifier(auditFile, auditURL string) (*Notifier, error) {
 	}
 
 	if auditURL != "" {
-		n.AddReceiver(NewURLReceiver(auditURL))
+		n.AddReceiver(NewURLReceiver(auditURL, newAuditHTTPClient()))
 	}
 
 	return n, nil

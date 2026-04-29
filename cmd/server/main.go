@@ -99,14 +99,11 @@ func main() {
 		}
 	}()
 
-	// Инициализируем роутер
-	r := router.NewRouter(cfg, repo, auditNotifier)
+	// Слой приложения: один раз на процесс (gRPC и при необходимости HTTP-хендлеры используют те же экземпляры).
+	userSvc, secretSvc, secretVersionSvc, attachmentSvc := newAppServices(cfg, repo)
 
-	// Сервисы для gRPC совпадают по смыслу с теми, что создаёт router (общий repo).
-	userSvc := service.NewUserService(cfg, repo)
-	secretSvc := service.NewSecretService(cfg, repo)
-	secretVersionSvc := service.NewSecretVersionService(cfg, repo)
-	attachmentSvc := service.NewAttachmentService(cfg, repo)
+	// Инициализируем роутер (сейчас только pprof; общий repo и audit уже передаём для возможного расширения).
+	r := router.NewRouter(cfg, repo, auditNotifier)
 
 	// Получаем адрес сервера из настроек и запускаем сервер
 	serverAddress := cfg.GetServerAddress()
@@ -192,4 +189,18 @@ func main() {
 	}()
 
 	shutdownWg.Wait()
+}
+
+// newAppServices создаёт сервисный слой один раз поверх общего repo.
+func newAppServices(cfg *config.ConfigServer, repo repository.GophKeeperRepository) (
+	service.UserService,
+	service.SecretService,
+	service.SecretVersionService,
+	service.AttachmentService,
+) {
+	userSvc := service.NewUserService(cfg, repo)
+	secretSvc := service.NewSecretService(cfg, repo)
+	secretVerSvc := service.NewSecretVersionService(cfg, repo)
+	attachmentSvc := service.NewAttachmentService(cfg, repo)
+	return userSvc, secretSvc, secretVerSvc, attachmentSvc
 }

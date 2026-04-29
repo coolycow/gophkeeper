@@ -9,18 +9,20 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 )
 
-// defaultRetryClient — HTTP-клиент с ретраями для отправки аудита.
-var defaultRetryClient = retryablehttp.NewClient()
-
 // URLReceiver отправляет события аудита на удалённый сервер методом POST.
 type URLReceiver struct {
 	url    string
 	client *retryablehttp.Client
 }
 
-// NewURLReceiver создаёт приёмник на удалённый URL.
-func NewURLReceiver(auditURL string) *URLReceiver {
-	return &URLReceiver{url: auditURL, client: defaultRetryClient}
+// newAuditHTTPClient возвращает HTTP-клиент с ретраями для отправки аудита.
+func newAuditHTTPClient() *retryablehttp.Client {
+	return retryablehttp.NewClient()
+}
+
+// NewURLReceiver создаёт приёмник на удалённый URL; client задаёт транспорт (ретраи и т.п.).
+func NewURLReceiver(auditURL string, client *retryablehttp.Client) *URLReceiver {
+	return &URLReceiver{url: auditURL, client: client}
 }
 
 // Send отправляет событие POST-запросом с JSON-телом (с автоматическими ретраями).
