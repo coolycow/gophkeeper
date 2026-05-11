@@ -3,6 +3,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/coolycow/gophkeeper/internal/model"
 )
@@ -23,30 +24,37 @@ type GophKeeperRepository interface {
 	HardDeleteUser(ctx context.Context, userID string) error               // полностью удаляет пользователя
 	GetUsersCount(ctx context.Context) int                                 // возвращает количество пользователей
 
+	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ REFRESH-ТОКЕНОВ //////////////////////////////////////////////////////////////
+	CreateRefreshToken(ctx context.Context, userID string, tokenHash []byte, expiresAt time.Time) (*model.RefreshToken, error) // создаёт запись refresh-токена
+	DeleteRefreshToken(ctx context.Context, id string) error                                                                   // удаляет запись (ротация / отзыв)
+	FindValidRefreshTokenByHash(ctx context.Context, tokenHash []byte, now time.Time) (*model.RefreshToken, error)             // находит неистёкшую запись по хэшу
+
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С СЕКРЕТАМИ //////////////////////////////////////////////////////////////
-	GetSecretByID(ctx context.Context, secretID string) (*model.Secret, error)                               // получает секрет по его ID
-	GetSecretsByUserID(ctx context.Context, userID string) ([]*model.Secret, error)                          // получает все секреты пользователя
-	GetSecretByUserIDAndSecretID(ctx context.Context, userID string, secretID string) (*model.Secret, error) // получает секрет по его ID и ID пользователя
-	CreateSecret(ctx context.Context, userID string, secret *model.Secret) (*model.Secret, error)            // создает секрет
-	UpdateSecret(ctx context.Context, userID string, secretID string, secret *model.Secret) error            // обновляет секрет
-	SoftDeleteSecret(ctx context.Context, userID string, secretID string) error                              // мягко удаляет секрет
-	HardDeleteSecret(ctx context.Context, userID string, secretID string) error                              // полностью удаляет секрет
-	CompressSecretByID(ctx context.Context, userID string, secretID string) error                            // удаляет все версии секрета кроме последней
-	CompressSecretsByUserID(ctx context.Context, userID string) error                                        // удаляет все версии секретов кроме последних для всех секретов пользователя
-	GetMaxSecretVersion(ctx context.Context, userID string, secretID string) (int, error)                    // получает максимальную версию секрета
+	GetSecretByID(ctx context.Context, secretID string) (*model.Secret, error)                                   // получает секрет по его ID
+	GetSecretsByUserID(ctx context.Context, userID string, scope model.SecretListScope) ([]*model.Secret, error) // список секретов: активные, корзина (мягко удалённые) или все
+	GetSecretByUserIDAndSecretID(ctx context.Context, userID string, secretID string) (*model.Secret, error)     // получает секрет по его ID и ID пользователя
+	CreateSecret(ctx context.Context, userID string, secret *model.Secret) (*model.Secret, error)                // создает секрет
+	UpdateSecret(ctx context.Context, userID string, secretID string, secret *model.Secret) error                // обновляет секрет
+	SoftDeleteSecret(ctx context.Context, userID string, secretID string) error                                  // мягко удаляет секрет
+	HardDeleteSecret(ctx context.Context, userID string, secretID string) error                                  // полностью удаляет секрет
+	CompressSecretByID(ctx context.Context, userID string, secretID string) error                                // удаляет все версии секрета кроме актуальной
+	CompressSecretsByUserID(ctx context.Context, userID string) error                                            // удаляет все версии секретов кроме актуальной для всех секретов пользователя
+	GetMaxSecretVersion(ctx context.Context, userID string, secretID string) (int, error)                        // получает максимальную версию секрета
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С ИСТОРИЕЙ СЕКРЕТОВ //////////////////////////////////////////////////////////////
+	GetCurrentSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error)                                 // получает текущую версию секрета
 	GetLatestSecretVersion(ctx context.Context, userID string, secretID string) (*model.SecretVersion, error)                                  // получает последнюю версию секрета
 	GetSecretVersionByID(ctx context.Context, userID string, secretID string, secretVersionID string) (*model.SecretVersion, error)            // получает версию секрета по его ID
 	GetAllSecretHistories(ctx context.Context, userID string, secretID string) ([]*model.SecretVersion, error)                                 // получает все версии секрета
 	CreateSecretVersion(ctx context.Context, userID string, secretID string, secretVersion *model.SecretVersion) (*model.SecretVersion, error) // создает версию секрета
 	HardDeleteSecretVersion(ctx context.Context, userID string, secretID string, secretVersionID string) error                                 // полностью удаляет версию секрета (мягкое удаление невозможно, т.к. не имеет смысла)
+	HardDeleteOldestSecretVersion(ctx context.Context, userID string, secretID string) error                                                   // полностью удаляет самую старую версию секрета (должна быть не актуальной версией)
 	RestoreSecretVersion(ctx context.Context, userID string, secretID string, secretVersionID string) error                                    // восстанавливает версию секрета (делает её текущей для секрета)
 
 	////////////////////////////////////////////////////////////// МЕТОДЫ ДЛЯ РАБОТЫ С ВЛОЖЕНИЯМИ //////////////////////////////////////////////////////////////
 	GetAttachmentByID(ctx context.Context, userID string, attachmentID string) (*model.Attachment, error)                                 // получает вложение по его ID
-	GetAttachmentsBySecretID(ctx context.Context, userID string, secretID string) ([]*model.Attachment, error)                            // получает все вложения по ID секрета
-	GetAttachmentsBySecretVersionID(ctx context.Context, userID string, secretVersionID string) ([]*model.Attachment, error)              // получает все вложения по ID версии секрета
+	GetAttachmentsBySecretID(ctx context.Context, userID string, secretID string) ([]*model.AttachmentSummary, error)                     // получает все вложения по ID секрета (без тела data_encrypted)
+	GetAttachmentsBySecretVersionID(ctx context.Context, userID string, secretVersionID string) ([]*model.AttachmentSummary, error)       // получает все вложения по ID версии секрета (без тела data_encrypted)
 	CreateAttachment(ctx context.Context, userID string, secretVersionID string, attachment *model.Attachment) (*model.Attachment, error) // создает вложение
 	HardDeleteAttachment(ctx context.Context, userID string, attachmentID string) error                                                   // удаляет вложение
 }

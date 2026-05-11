@@ -2,14 +2,11 @@ package service
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -37,12 +34,13 @@ type UserService interface {
 	SoftDeleteUser(ctx context.Context, userID string) error
 	HardDeleteUser(ctx context.Context, userID string) error
 
-	// Методы для работы с куками
-	GetUserIDFromCookie(cookie *http.Cookie) (string, error)
-	GetCookieValueByUser(user model.User) (string, error)
-	GetCookieValueByUserID(userID string) (string, error)
+	// IssueAuthTokens выдаёт JWT access и непрозрачный refresh (refresh хранится в БД по хэшу).
+	IssueAuthTokens(ctx context.Context, user *model.User) (accessToken, refreshToken string, accessExpiresAt time.Time, err error)
 
-	// GetUserIDFromAuthToken — то же значение, что и cookie auth (metadata authorization / Bearer).
+	// ExchangeRefreshToken проверяет refresh в БД и выдаёт новую пару токенов.
+	ExchangeRefreshToken(ctx context.Context, refreshToken string) (*model.User, string, string, time.Time, error)
+
+	// GetUserIDFromAuthToken проверяет JWT access (metadata authorization / Bearer).
 	GetUserIDFromAuthToken(token string) (string, error)
 }
 
@@ -134,7 +132,8 @@ func (s *userService) CreateUser(ctx context.Context, request model.UserRegister
 	// Проверяем, существует ли пользователь с такой email
 	existingUser, err := s.repo.GetUserByEmail(ctx, request.Email)
 
-	if err != nil {
+	// Если ошибка, возвращаем ошибку, если она не является ошибкой отсутствия пользователя
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, keeperError.CustomError{
 			Message:    err.Error(),
 			StatusCode: http.StatusInternalServerError,
@@ -171,13 +170,15 @@ func (s *userService) CreateUser(ctx context.Context, request model.UserRegister
 		}
 	}
 
+	now := time.Now()
+
 	// Создаём пользователя
 	return s.repo.CreateUser(ctx, &model.User{
 		Email:     request.Email,
 		Password:  hashedPassword,
 		Salt:      hex.EncodeToString(salt),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: &now,
+		UpdatedAt: &now,
 	})
 }
 
@@ -265,12 +266,14 @@ func (s *userService) UpdateUser(ctx context.Context, userID string, request mod
 
 	// TODO: Если изменился пароль, то все данные должны быть зашифрованы заново
 
+	now := time.Now()
+
 	// Обновляем пользователя
 	return s.repo.UpdateUser(ctx, userID, &model.User{
-		Email:     request.Email, // Email может быть изменен или не изменен
+		Email:     user.Email, // актуальный email
 		Password:  user.Password, // Пароль может быть изменен или не изменен
 		Salt:      user.Salt,     // Соль не изменяется
-		UpdatedAt: time.Now(),
+		UpdatedAt: &now,
 	})
 }
 
@@ -282,91 +285,4 @@ func (s *userService) SoftDeleteUser(ctx context.Context, userID string) error {
 // HardDeleteUser полностью удаляет пользователя
 func (s *userService) HardDeleteUser(ctx context.Context, userID string) error {
 	return s.repo.HardDeleteUser(ctx, userID)
-}
-
-// GetUserIDFromCookie достаёт UserID из переданной куки
-func (s *userService) GetUserIDFromCookie(cookie *http.Cookie) (string, error) {
-	return s.GetUserIDFromAuthToken(cookie.Value)
-}
-
-// GetUserIDFromAuthToken декодирует hex-токен (gRPC metadata authorization).
-func (s *userService) GetUserIDFromAuthToken(token string) (string, error) {
-	// Убираем пробелы и префикс "bearer "
-	token = strings.TrimSpace(token)
-	if len(token) > 6 && strings.EqualFold(token[:7], "bearer ") {
-		token = strings.TrimSpace(token[7:])
-	}
-
-	// Сохраняем значение токена
-	cookieValue := token
-
-	// Декодируем hex
-	data, err := hex.DecodeString(cookieValue)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode hex cookie value: %w", err)
-	}
-
-	if len(data) == 0 {
-		return "", errors.New("invalid cookie")
-	}
-
-	key := sha256.Sum256([]byte(s.cfg.SecretKey))
-
-	aesBlock, err := aes.NewCipher(key[:])
-	if err != nil {
-		return "", fmt.Errorf("failed to create AES cipher: %w", err)
-	}
-
-	aesGCM, err := cipher.NewGCM(aesBlock)
-	if err != nil {
-		return "", fmt.Errorf("failed to create GCM cipher: %w", err)
-	}
-
-	// создаём вектор инициализации
-	nonceSize := aesGCM.NonceSize()
-
-	// Разделяем nonce и зашифрованные данные
-	nonce := data[:nonceSize]
-	ciphertext := data[nonceSize:]
-
-	// расшифровываем
-	decrypted, err := aesGCM.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return "", err
-	}
-
-	return string(decrypted), nil
-}
-
-// GetCookieValueByUser возвращает значение куки для указанного user
-func (s *userService) GetCookieValueByUser(user model.User) (string, error) {
-	return s.GetCookieValueByUserID(user.ID)
-}
-
-// GetCookieValueByUserID возвращает значение куки для указанного userID
-func (s *userService) GetCookieValueByUserID(userID string) (string, error) {
-	key := sha256.Sum256([]byte(s.cfg.SecretKey))
-
-	aesBlock, err := aes.NewCipher(key[:])
-	if err != nil {
-		return "", fmt.Errorf("failed to create AES cipher: %w", err)
-	}
-
-	aesGCM, err := cipher.NewGCM(aesBlock)
-	if err != nil {
-		return "", fmt.Errorf("failed to create GCM cipher: %w", err)
-	}
-
-	// создаём вектор инициализации
-	nonce, err := generateRandom(aesGCM.NonceSize())
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random nonce: %w", err)
-	}
-
-	dst := aesGCM.Seal(nil, nonce, []byte(userID), nil)
-
-	// Сохраняем nonce вместе с зашифрованными данными
-	result := append(nonce, dst...)
-
-	return hex.EncodeToString(result), nil
 }

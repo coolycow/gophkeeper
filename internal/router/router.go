@@ -4,30 +4,37 @@ package router
 import (
 	"net/http/pprof"
 
-	"github.com/coolycow/shortener/internal/config"
-	"github.com/coolycow/shortener/internal/middleware"
-	"github.com/coolycow/shortener/internal/observer/audit"
-	"github.com/coolycow/shortener/internal/repository"
+	"github.com/coolycow/gophkeeper/internal/config"
+	"github.com/coolycow/gophkeeper/internal/middleware"
+	"github.com/coolycow/gophkeeper/internal/observer/audit"
+	"github.com/coolycow/gophkeeper/internal/repository"
 	"github.com/gin-gonic/contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
-// NewRouter создаёт HTTP-роутер с маршрутами сервиса коротких ссылок, gzip, логированием и pprof.
-func NewRouter(cfg *config.Config, repo repository.URLRepository, auditNotifier *audit.Notifier) *gin.Engine {
+// NewRouter создаёт HTTP-роутер с маршрутами сервиса, gzip, логированием и pprof.
+// По сути в приложении не используется HTTP-сервер для реальной работы сервиса.
+// Но для тестирования и отладки используется HTTP-сервер с маршрутами для pprof.
+// Изначально была идея сделать HTTP-сервер для реальной работы сервиса, но в итоге остановился на gRPC.
+func NewRouter(cfg *config.ConfigServer, repo repository.GophKeeperRepository, auditNotifier *audit.Notifier) *gin.Engine {
 	router := gin.Default()
 
+	// Используем gzip для сжатия данных
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
+	// Логируем запросы
 	router.Use(middleware.RequestLogger())
+	// Обрабатываем ошибки
 	router.Use(middleware.ErrorHandler())
+	// Сжимаем данные
 	router.Use(middleware.RequestGzip())
 
-	setupURLRoutes(router, cfg, repo, auditNotifier)
-
+	// Настраиваем маршруты для pprof
 	setupPprof(router)
 
 	return router
 }
 
+// setupPprof настраивает маршруты для pprof.
 func setupPprof(r *gin.Engine) {
 	g := r.Group("/debug/pprof")
 	g.GET("/", gin.WrapF(pprof.Index))

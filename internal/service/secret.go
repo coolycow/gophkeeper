@@ -17,7 +17,7 @@ import (
 type SecretService interface {
 	// Методы для получения секрета
 	GetSecretByID(ctx context.Context, secretID string) (*model.Secret, error)
-	GetSecretsByUserID(ctx context.Context, userID string) ([]*model.Secret, error)
+	GetSecretsByUserID(ctx context.Context, userID string, scope model.SecretListScope) ([]*model.Secret, error)
 	GetSecretByUserIDAndSecretID(ctx context.Context, userID string, secretID string) (*model.Secret, error)
 
 	// Методы для работы с секретами
@@ -52,9 +52,9 @@ func (s *secretService) GetSecretByID(ctx context.Context, secretID string) (*mo
 	return s.repo.GetSecretByID(ctx, secretID)
 }
 
-// GetSecretsByUserID получает все секреты пользователя
-func (s *secretService) GetSecretsByUserID(ctx context.Context, userID string) ([]*model.Secret, error) {
-	return s.repo.GetSecretsByUserID(ctx, userID)
+// GetSecretsByUserID получает секреты пользователя с учётом scope (активные / корзина / все).
+func (s *secretService) GetSecretsByUserID(ctx context.Context, userID string, scope model.SecretListScope) ([]*model.Secret, error) {
+	return s.repo.GetSecretsByUserID(ctx, userID, scope)
 }
 
 // GetSecretByUserIDAndSecretID получает секрет по его ID и ID пользователя
@@ -66,14 +66,27 @@ func (s *secretService) GetSecretByUserIDAndSecretID(ctx context.Context, userID
 func (s *secretService) CreateSecret(ctx context.Context, userID string, request model.SecretCreateRequest) (*model.Secret, error) {
 	// Создаём объект секрета
 	// ID текущей версии секрета генерируется автоматически в репозитории в момент создания секрета
+	dfv := request.DataFormatVersion
+	if dfv == 0 {
+		dfv = 1
+	}
+
+	// Получаем зашифрованные данные
+	data := request.DataEncrypted
+
+	// Создаем секрет
+	now := time.Now()
+
 	secret := &model.Secret{
 		UserID:    userID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		DeletedAt: time.Time{},
+		CreatedAt: &now,
+		UpdatedAt: &now,
 		SecretVersions: []*model.SecretVersion{
 			{
-				DataEncrypted: request.DataEncrypted,
+				DataFormatVersion: dfv,
+				DataEncrypted:     data,
+				DataSize:          len(data),
+				TitleEncrypted:    request.TitleEncrypted,
 			},
 		},
 	}
@@ -104,7 +117,8 @@ func (s *secretService) UpdateSecret(ctx context.Context, userID string, secretI
 
 	// Обновляем секрет
 	secret.SecretVersions = append(secret.SecretVersions, &model.SecretVersion{
-		DataEncrypted: request.DataEncrypted,
+		DataEncrypted:  request.DataEncrypted,
+		TitleEncrypted: request.TitleEncrypted,
 	})
 
 	return s.repo.UpdateSecret(ctx, userID, secretID, secret)
